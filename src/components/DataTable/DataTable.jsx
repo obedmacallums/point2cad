@@ -27,20 +27,23 @@ export default function DataTable({ columns, data, maxHeight = '100%' }) {
         <thead className="sticky top-0 z-10 bg-gray-800">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id}>
-              {hg.headers.map((header) => (
-                <th
-                  key={header.id}
-                  onClick={header.column.getToggleSortingHandler()}
-                  className="px-3 py-2 text-left text-gray-300 font-semibold whitespace-nowrap cursor-pointer select-none hover:bg-gray-700 transition-colors border-b border-gray-700"
-                >
-                  <span className="flex items-center gap-1">
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                    <span className="text-gray-500 text-[10px]">
-                      {{ asc: '↑', desc: '↓' }[header.column.getIsSorted()] ?? '⇅'}
+              {hg.headers.map((header) => {
+                const extra = header.column.columnDef.meta?.headerClassName ?? ''
+                return (
+                  <th
+                    key={header.id}
+                    onClick={header.column.getToggleSortingHandler()}
+                    className={`px-3 py-2 text-left text-gray-300 font-semibold whitespace-nowrap cursor-pointer select-none hover:bg-gray-700 transition-colors border-b border-gray-700 ${extra}`}
+                  >
+                    <span className="flex items-center gap-1">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      <span className="text-gray-500 text-[10px]">
+                        {{ asc: '↑', desc: '↓' }[header.column.getIsSorted()] ?? '⇅'}
+                      </span>
                     </span>
-                  </span>
-                </th>
-              ))}
+                  </th>
+                )
+              })}
             </tr>
           ))}
         </thead>
@@ -53,11 +56,17 @@ export default function DataTable({ columns, data, maxHeight = '100%' }) {
                 i % 2 === 0 ? 'bg-gray-900' : 'bg-gray-900/60'
               }`}
             >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-3 py-1.5 text-gray-200 font-mono whitespace-nowrap">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
+              {row.getVisibleCells().map((cell) => {
+                const extra = cell.column.columnDef.meta?.cellClassName ?? ''
+                return (
+                  <td
+                    key={cell.id}
+                    className={`px-3 py-1.5 text-gray-200 font-mono whitespace-nowrap ${extra}`}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                )
+              })}
             </tr>
           ))}
         </tbody>

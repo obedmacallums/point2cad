@@ -42,6 +42,43 @@ const DECIMAL_OPTIONS = [
   { value: ',', label: ', (coma)' },
 ]
 
+// Color por campo requerido: resalta en la tabla las columnas ya mapeadas.
+const FIELD_ACCENT = {
+  nombre: {
+    th: 'bg-cyan-900/40 text-cyan-100',
+    td: 'bg-cyan-950/30',
+    badge: 'bg-cyan-700 text-white',
+  },
+  x: {
+    th: 'bg-rose-900/40 text-rose-100',
+    td: 'bg-rose-950/30',
+    badge: 'bg-rose-700 text-white',
+  },
+  y: {
+    th: 'bg-emerald-900/40 text-emerald-100',
+    td: 'bg-emerald-950/30',
+    badge: 'bg-emerald-700 text-white',
+  },
+  z: {
+    th: 'bg-amber-900/40 text-amber-100',
+    td: 'bg-amber-950/30',
+    badge: 'bg-amber-700 text-white',
+  },
+  codigo: {
+    th: 'bg-violet-900/40 text-violet-100',
+    td: 'bg-violet-950/30',
+    badge: 'bg-violet-700 text-white',
+  },
+}
+
+const FIELD_BADGE_LABEL = {
+  nombre: 'NOMBRE',
+  x: 'X',
+  y: 'Y',
+  z: 'Z',
+  codigo: 'CÓDIGO',
+}
+
 export default function CSVPreview() {
   const { state, dispatch } = useApp()
   const { detectCodes, processCSV, isLoading, isRunning } = usePythonBridge()
@@ -52,15 +89,42 @@ export default function CSVPreview() {
   const isProcessing = state.appMode === 'processing' || state.isProcessing
   const busy = isRunning || isDetecting || isProcessing
 
+  // Mapa inverso: header del CSV → campo requerido al que está mapeado (o undefined).
+  const headerToField = useMemo(() => {
+    const map = {}
+    for (const f of REQUIRED_FIELDS) {
+      const col = state.columnMapping[f]
+      if (col) map[col] = f
+    }
+    return map
+  }, [state.columnMapping])
+
   const previewColumns = useMemo(
     () =>
-      (state.csvHeaders ?? []).map((h) =>
-        colHelper.accessor(h, {
-          header: h.toUpperCase(),
+      (state.csvHeaders ?? []).map((h) => {
+        const mappedField = headerToField[h]
+        const accent = mappedField ? FIELD_ACCENT[mappedField] : null
+        return colHelper.accessor(h, {
+          header: () => (
+            <span className="inline-flex items-center gap-1.5">
+              <span>{h.toUpperCase()}</span>
+              {mappedField && (
+                <span
+                  className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${accent.badge}`}
+                >
+                  {FIELD_BADGE_LABEL[mappedField]}
+                </span>
+              )}
+            </span>
+          ),
           cell: (info) => String(info.getValue() ?? ''),
+          meta: {
+            headerClassName: accent?.th ?? '',
+            cellClassName: accent?.td ?? '',
+          },
         })
-      ),
-    [state.csvHeaders]
+      }),
+    [state.csvHeaders, headerToField]
   )
 
   const previewRows = useMemo(
