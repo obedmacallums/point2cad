@@ -1,6 +1,10 @@
 import { useRef } from 'react'
 import { useApp } from '../../context/AppContext'
-import { readFileAsText, parseCSVPreview } from '../../utils/csvLoader'
+import {
+  readFileAsText,
+  parseCSVPreview,
+  DEFAULT_PARSE_OPTIONS,
+} from '../../utils/csvLoader'
 
 export default function FileUpload() {
   const inputRef = useRef(null)
@@ -12,11 +16,12 @@ export default function FileUpload() {
 
     try {
       const rawCSVText = await readFileAsText(file)
-      const { headers, rows } = parseCSVPreview(rawCSVText)
+      const parseOptions = { ...DEFAULT_PARSE_OPTIONS }
+      const { headers, rows } = parseCSVPreview(rawCSVText, parseOptions)
 
       dispatch({
         type: 'SET_CSV_PREVIEW',
-        payload: { rawCSVText, headers, rows, fileName: file.name },
+        payload: { rawCSVText, headers, rows, fileName: file.name, parseOptions },
       })
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: err.message })

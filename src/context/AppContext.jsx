@@ -1,5 +1,10 @@
 import { createContext, useContext, useReducer } from 'react'
-import { autoDetectMapping, REQUIRED_FIELDS } from '../utils/csvLoader'
+import {
+  autoDetectMapping,
+  parseCSVPreview,
+  DEFAULT_PARSE_OPTIONS,
+  REQUIRED_FIELDS,
+} from '../utils/csvLoader'
 
 const AppContext = createContext(null)
 
@@ -12,6 +17,9 @@ const initialState = {
   rawCSVText: null,
   rawCSVRows: [],
   csvHeaders: [],
+
+  // Opciones de parsing aplicadas al rawCSVText
+  parseOptions: { ...DEFAULT_PARSE_OPTIONS },
 
   // Mapeo del CSV original → campos canónicos requeridos por Python
   columnMapping: emptyMapping(),
@@ -34,7 +42,7 @@ const initialState = {
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_CSV_PREVIEW': {
-      const { rawCSVText, rows, headers, fileName } = action.payload
+      const { rawCSVText, rows, headers, fileName, parseOptions } = action.payload
       return {
         ...state,
         appMode: 'preview',
@@ -42,6 +50,7 @@ function reducer(state, action) {
         rawCSVRows: rows,
         csvHeaders: headers,
         fileName,
+        parseOptions: { ...DEFAULT_PARSE_OPTIONS, ...(parseOptions ?? {}) },
         columnMapping: autoDetectMapping(headers),
         codesSummary: [],
         featureLibrary: {},
@@ -49,6 +58,32 @@ function reducer(state, action) {
         lines: [],
         polylines: [],
         error: null,
+      }
+    }
+
+    case 'SET_PARSE_OPTIONS': {
+      const merged = { ...state.parseOptions, ...action.payload }
+      if (!state.rawCSVText) {
+        return { ...state, parseOptions: merged }
+      }
+      try {
+        const { headers, rows } = parseCSVPreview(state.rawCSVText, merged)
+        return {
+          ...state,
+          appMode: 'preview',
+          parseOptions: merged,
+          csvHeaders: headers,
+          rawCSVRows: rows,
+          columnMapping: autoDetectMapping(headers),
+          codesSummary: [],
+          featureLibrary: {},
+          points: [],
+          lines: [],
+          polylines: [],
+          error: null,
+        }
+      } catch (err) {
+        return { ...state, parseOptions: merged, error: err.message }
       }
     }
 
