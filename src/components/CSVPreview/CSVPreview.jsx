@@ -413,10 +413,16 @@ export default function CSVPreview() {
                 : isMissing
                   ? 'border-yellow-700'
                   : 'border-gray-700'
+              const accent = FIELD_ACCENT[field]
               return (
                 <label key={field} className="flex flex-col gap-1">
-                  <span className="text-[11px] uppercase text-gray-500 font-semibold">
-                    {FIELD_LABELS[field]}
+                  <span className="flex items-center gap-1.5 text-[11px] uppercase text-gray-500 font-semibold">
+                    <span
+                      className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${accent.badge}`}
+                    >
+                      {FIELD_BADGE_LABEL[field]}
+                    </span>
+                    <span>{FIELD_LABELS[field]}</span>
                   </span>
                   <select
                     value={value}
