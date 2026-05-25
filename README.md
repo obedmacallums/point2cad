@@ -1,4 +1,4 @@
-# Point2cad
+# point2cad
 
 Point2CAD es una herramienta de automatización que convierte listas de coordenadas de un archivo CSV directamente en dibujos inteligentes para software de CAD. La aplicación lee los códigos de campo de cada punto (como ARBOL, POSTE o CERCA) y, a través de una biblioteca de características personalizada, genera de forma automática las figuras geométricas correspondientes, asigna capas y colores, y coloca las etiquetas de texto con sus nombres en la posición exacta. En resumen, transforma datos tabulares abstractos en planos listos para usar en cuestión de segundos, eliminando por completo el dibujo manual.
 
