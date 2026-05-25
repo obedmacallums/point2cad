@@ -79,6 +79,18 @@ const FIELD_BADGE_LABEL = {
   codigo: 'CÓDIGO',
 }
 
+// Paleta rápida: colores ACI clásicos de AutoCAD + negro.
+const QUICK_COLORS = [
+  { hex: '#ff0000', name: 'Rojo' },
+  { hex: '#ffff00', name: 'Amarillo' },
+  { hex: '#00ff00', name: 'Verde' },
+  { hex: '#00ffff', name: 'Cian' },
+  { hex: '#0000ff', name: 'Azul' },
+  { hex: '#ff00ff', name: 'Magenta' },
+  { hex: '#ffffff', name: 'Blanco' },
+  { hex: '#000000', name: 'Negro' },
+]
+
 export default function CSVPreview() {
   const { state, dispatch } = useApp()
   const { detectCodes, processCSV, isLoading, isRunning } = usePythonBridge()
@@ -498,7 +510,7 @@ export default function CSVPreview() {
             </p>
           </div>
 
-          <div className="grid grid-cols-[28px_1fr_140px_120px] gap-3 text-[11px] font-semibold text-gray-500 uppercase px-2">
+          <div className="grid grid-cols-[180px_1fr_140px_120px] gap-3 text-[11px] font-semibold text-gray-500 uppercase px-2">
             <span>Color</span>
             <span>Código</span>
             <span>Capa DXF</span>
@@ -511,20 +523,41 @@ export default function CSVPreview() {
               return (
                 <div
                   key={codigo}
-                  className="grid grid-cols-[28px_1fr_140px_120px] items-center gap-3 bg-gray-800/60 hover:bg-gray-800 rounded-lg px-2 py-2 transition-colors"
+                  className="grid grid-cols-[180px_1fr_140px_120px] items-center gap-3 bg-gray-800/60 hover:bg-gray-800 rounded-lg px-2 py-2 transition-colors"
                 >
-                  <div className="relative w-6 h-6 flex-shrink-0">
-                    <input
-                      type="color"
-                      value={feature.color}
-                      onChange={(e) => updateFeature(codigo, { color: e.target.value })}
-                      className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                      title="Cambiar color"
-                    />
-                    <div
-                      className="w-6 h-6 rounded-full border-2 border-gray-600 pointer-events-none"
-                      style={{ backgroundColor: feature.color }}
-                    />
+                  <div className="flex items-center gap-2">
+                    <div className="relative w-6 h-6 flex-shrink-0">
+                      <input
+                        type="color"
+                        value={feature.color}
+                        onChange={(e) => updateFeature(codigo, { color: e.target.value })}
+                        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                        title="Color personalizado"
+                      />
+                      <div
+                        className="w-6 h-6 rounded-full border-2 border-gray-600 pointer-events-none"
+                        style={{ backgroundColor: feature.color }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      {QUICK_COLORS.map(({ hex, name }) => {
+                        const selected = feature.color.toLowerCase() === hex.toLowerCase()
+                        return (
+                          <button
+                            key={hex}
+                            type="button"
+                            onClick={() => updateFeature(codigo, { color: hex })}
+                            title={name}
+                            className={`w-4 h-4 rounded-sm transition-transform hover:scale-125 ${
+                              selected
+                                ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-800'
+                                : 'border border-gray-700'
+                            }`}
+                            style={{ backgroundColor: hex }}
+                          />
+                        )
+                      })}
+                    </div>
                   </div>
 
                   <span className="font-mono text-xs font-semibold text-blue-300 truncate">
