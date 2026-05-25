@@ -7,8 +7,8 @@ Usa la librería ezdxf (disponible en Pyodide).
 Para cada código crea una capa con el color recibido en feature_library.
 Entidades generadas:
   - puntos         → INSERT de bloque punto o POINT
-  - líneas         → LWPOLYLINE abierta
-  - polilíneas cerradas → LWPOLYLINE cerrada
+  - líneas         → POLYLINE 3D abierta (preserva Z por vértice)
+  - polilíneas cerradas → POLYLINE 3D cerrada (preserva Z por vértice)
   - etiquetas      → TEXT con el campo "nombre" en la posición del punto
 
 Entrada : geometry (dict) — salida de geometry_builder
@@ -57,19 +57,19 @@ def generate_dxf(geometry: dict, feature_library: dict) -> str:
             dxfattribs={"layer": capa, "height": 0.5},
         ).set_placement((pt["x"], pt["y"], pt["z"]))
 
-    # Líneas
+    # Líneas (POLYLINE 3D para preservar Z por vértice)
     for line in geometry.get("lines", []):
         feature = feature_library.get(line["codigo"], {})
         capa = feature.get("capa", line["codigo"])
-        pts_2d = [(v[0], v[1]) for v in line["vertices"]]
-        msp.add_lwpolyline(pts_2d, dxfattribs={"layer": capa, "closed": False})
+        pts_3d = [(v[0], v[1], v[2]) for v in line["vertices"]]
+        msp.add_polyline3d(pts_3d, dxfattribs={"layer": capa})
 
-    # Polilíneas cerradas
+    # Polilíneas cerradas (POLYLINE 3D cerrada)
     for poly in geometry.get("polylines", []):
         feature = feature_library.get(poly["codigo"], {})
         capa = feature.get("capa", poly["codigo"])
-        pts_2d = [(v[0], v[1]) for v in poly["vertices"]]
-        msp.add_lwpolyline(pts_2d, dxfattribs={"layer": capa, "closed": True})
+        pts_3d = [(v[0], v[1], v[2]) for v in poly["vertices"]]
+        msp.add_polyline3d(pts_3d, close=True, dxfattribs={"layer": capa})
 
     buffer = io.StringIO()
     doc.write(buffer)

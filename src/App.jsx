@@ -5,6 +5,7 @@ import CSVPreview from './components/CSVPreview/CSVPreview'
 import ResultsPanel from './components/ResultsPanel/ResultsPanel'
 import FeatureLibrary from './components/FeatureLibrary/FeatureLibrary'
 import ExportPanel from './components/ExportPanel/ExportPanel'
+import IdleDropZone from './components/IdleDropZone/IdleDropZone'
 
 function MainArea() {
   const { state, dispatch } = useApp()
@@ -23,15 +24,7 @@ function MainArea() {
       return <Viewer3D />
 
     default:
-      return (
-        <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-600 select-none">
-          <svg className="w-16 h-16 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-              d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <p className="text-sm">Importa un archivo CSV para comenzar</p>
-        </div>
-      )
+      return <IdleDropZone />
   }
 }
 
