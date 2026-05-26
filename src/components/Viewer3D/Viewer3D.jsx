@@ -1,10 +1,24 @@
-import { useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo, useCallback } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { OrbitControls, Grid, Line, Instances, Instance, Html } from '@react-three/drei'
+import {
+  OrbitControls,
+  Grid,
+  Line,
+  Instances,
+  Instance,
+  Html,
+  GizmoHelper,
+  GizmoViewport,
+} from '@react-three/drei'
 import { useApp } from '../../context/AppContext'
+import ViewerToolbar from './ViewerToolbar'
 
-function CameraRig({ spread, controlsRef }) {
+function CameraRig({ spread, controlsRef, cameraRef }) {
   const { camera } = useThree()
+
+  useEffect(() => {
+    cameraRef.current = camera
+  }, [camera, cameraRef])
 
   useEffect(() => {
     camera.position.set(0, spread * 0.9, spread * 1.4)
@@ -22,6 +36,7 @@ export default function Viewer3D() {
   const { state } = useApp()
   const { points, lines, polylines, featureLibrary } = state
   const controlsRef = useRef()
+  const cameraRef = useRef()
 
   const lib = featureLibrary ?? {}
 
@@ -88,86 +103,130 @@ export default function Viewer3D() {
     return groups
   }, [visiblePoints, lib]) // eslint-disable-line
 
+  const setView = useCallback(
+    (view) => {
+      const cam = cameraRef.current
+      const ctrl = controlsRef.current
+      if (!cam || !ctrl) return
+
+      // Pequeño offset (0.001) en vista superior para evitar gimbal lock de OrbitControls
+      const d = spread * 1.4
+      const positions = {
+        top: [0, d, 0.001],
+        front: [0, 0, d],
+        side: [d, 0, 0],
+        iso: [0, spread * 0.9, d],
+        fit: [0, spread * 0.9, d],
+      }
+
+      const [x, y, z] = positions[view] ?? positions.iso
+      cam.position.set(x, y, z)
+      ctrl.target.set(0, 0, 0)
+      cam.lookAt(0, 0, 0)
+      ctrl.update()
+    },
+    [spread],
+  )
+
   return (
-    <Canvas
-      camera={{ position: [0, 100, 100], fov: 50, near: 0.1, far: spread * 20 }}
-      className="bg-gray-950"
-    >
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[1, 2, 1]} intensity={0.6} />
+    <div className="relative h-full w-full">
+      <Canvas
+        camera={{ position: [0, 100, 100], fov: 50, near: 0.1, far: spread * 20 }}
+        className="bg-gray-950"
+      >
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[1, 2, 1]} intensity={0.6} />
 
-      <OrbitControls ref={controlsRef} makeDefault />
-      <Grid
-        infiniteGrid
-        cellSize={spread * 0.05}
-        sectionSize={spread * 0.2}
-        fadeDistance={spread * 4}
-        position={[0, -pointSize * 0.5, 0]}
-      />
-
-      <CameraRig spread={spread} controlsRef={controlsRef} />
-
-      {/* Puntos: una InstancedMesh por color (1 draw call por grupo) */}
-      {Object.entries(pointsByColor).map(([color, pts]) => (
-        <Instances key={color} limit={pts.length}>
-          <sphereGeometry args={[pointSize, 10, 10]} />
-          <meshStandardMaterial color={color} />
-          {pts.map((pt) => {
-            const [lx, ly, lz] = toLocal([pt.x, pt.y, pt.z])
-            return <Instance key={pt.nombre} position={[lx, ly, lz]} />
-          })}
-        </Instances>
-      ))}
-
-      {/* Etiquetas (DOM): aceptable para cientos de puntos; con miles conviene troika-three-text */}
-      {visiblePoints.map((pt) => {
-        const [lx, ly, lz] = toLocal([pt.x, pt.y, pt.z])
-        return (
-          <Html
-            key={`label-${pt.nombre}`}
-            position={[lx, ly, lz]}
-            center
-            distanceFactor={pointSize * 50}
-          >
-            <span
-              style={{
-                color: 'white',
-                fontSize: '11px',
-                background: 'rgba(0,0,0,0.55)',
-                padding: '1px 5px',
-                borderRadius: '3px',
-                whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-              }}
-            >
-              {pt.nombre}
-            </span>
-          </Html>
-        )
-      })}
-
-      {/* Líneas abiertas */}
-      {visibleLines.map((line, i) => (
-        <Line
-          key={`line-${i}`}
-          points={line.vertices.map(toLocal)}
-          color={getColor(line.codigo)}
-          lineWidth={2}
+        <OrbitControls ref={controlsRef} makeDefault />
+        <Grid
+          infiniteGrid
+          cellSize={spread * 0.05}
+          sectionSize={spread * 0.2}
+          fadeDistance={spread * 4}
+          position={[0, -pointSize * 0.5, 0]}
         />
-      ))}
 
-      {/* Polilíneas cerradas */}
-      {visiblePolylines.map((poly, i) => {
-        const pts = poly.vertices.map(toLocal)
-        return (
+        <CameraRig
+          spread={spread}
+          controlsRef={controlsRef}
+          cameraRef={cameraRef}
+        />
+
+        {/* Puntos: una InstancedMesh por color (1 draw call por grupo) */}
+        {Object.entries(pointsByColor).map(([color, pts]) => (
+          <Instances key={color} limit={pts.length}>
+            <sphereGeometry args={[pointSize, 10, 10]} />
+            <meshStandardMaterial color={color} />
+            {pts.map((pt) => {
+              const [lx, ly, lz] = toLocal([pt.x, pt.y, pt.z])
+              return <Instance key={pt.nombre} position={[lx, ly, lz]} />
+            })}
+          </Instances>
+        ))}
+
+        {/* Etiquetas (DOM): aceptable para cientos de puntos; con miles conviene troika-three-text */}
+        {visiblePoints.map((pt) => {
+          const [lx, ly, lz] = toLocal([pt.x, pt.y, pt.z])
+          return (
+            <Html
+              key={`label-${pt.nombre}`}
+              position={[lx, ly, lz]}
+              center
+              distanceFactor={pointSize * 50}
+            >
+              <span
+                style={{
+                  color: 'white',
+                  fontSize: '11px',
+                  background: 'rgba(0,0,0,0.55)',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  whiteSpace: 'nowrap',
+                  pointerEvents: 'none',
+                }}
+              >
+                {pt.nombre}
+              </span>
+            </Html>
+          )
+        })}
+
+        {/* Líneas abiertas */}
+        {visibleLines.map((line, i) => (
           <Line
-            key={`poly-${i}`}
-            points={[...pts, pts[0]]}
-            color={getColor(poly.codigo)}
+            key={`line-${i}`}
+            points={line.vertices.map(toLocal)}
+            color={getColor(line.codigo)}
             lineWidth={2}
           />
-        )
-      })}
-    </Canvas>
+        ))}
+
+        {/* Polilíneas cerradas */}
+        {visiblePolylines.map((poly, i) => {
+          const pts = poly.vertices.map(toLocal)
+          return (
+            <Line
+              key={`poly-${i}`}
+              points={[...pts, pts[0]]}
+              color={getColor(poly.codigo)}
+              lineWidth={2}
+            />
+          )
+        })}
+
+        {/* Gizmo de ejes en esquina (rota con la cámara, clickeable).
+            Labels remapean three.js (X, Y, Z) → semántica CSV/topográfica (X, Z, Y):
+            three-Y es la altura (Z del CSV) y three-Z corresponde al eje Y horizontal. */}
+        <GizmoHelper alignment="bottom-right" margin={[64, 64]}>
+          <GizmoViewport
+            axisColors={['#ef4444', '#3b82f6', '#22c55e']}
+            labelColor="white"
+            labels={['X', 'Z', 'Y']}
+          />
+        </GizmoHelper>
+      </Canvas>
+
+      <ViewerToolbar onSetView={setView} />
+    </div>
   )
 }
