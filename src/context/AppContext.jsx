@@ -133,8 +133,18 @@ function reducer(state, action) {
         appMode: 'ready',
       }
 
-    case 'SET_MODE':
+    case 'SET_MODE': {
+      if (action.payload === 'viewer') {
+        const resetLibrary = Object.fromEntries(
+          Object.entries(state.featureLibrary).map(([codigo, feature]) => [
+            codigo,
+            { ...feature, visible: true },
+          ]),
+        )
+        return { ...state, appMode: 'viewer', featureLibrary: resetLibrary }
+      }
       return { ...state, appMode: action.payload }
+    }
 
     case 'SET_ERROR': {
       // Volver al último estado seguro según la fase donde ocurrió el error

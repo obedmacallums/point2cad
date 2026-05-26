@@ -1,10 +1,18 @@
 import { useApp } from '../../context/AppContext'
 
 export default function FeatureLibrary() {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   const entries = Object.entries(state.featureLibrary ?? {})
+  const isViewer = state.appMode === 'viewer'
 
   if (entries.length === 0) return null
+
+  function toggleVisibility(codigo, checked) {
+    dispatch({
+      type: 'UPDATE_FEATURE',
+      payload: { codigo, changes: { visible: checked } },
+    })
+  }
 
   return (
     <section className="flex flex-col gap-2">
@@ -15,18 +23,28 @@ export default function FeatureLibrary() {
       <div className="flex flex-col gap-1 text-xs">
         {entries.map(([codigo, feature]) => {
           if (!feature) return null
+          const visible = feature.visible !== false
+          const rowClass = `flex items-center gap-2 bg-gray-800 rounded px-2 py-1 transition-opacity ${
+            isViewer && !visible ? 'opacity-50' : ''
+          }`
           return (
-            <div
-              key={codigo}
-              className="flex items-center gap-2 bg-gray-800 rounded px-2 py-1"
-            >
+            <div key={codigo} className={rowClass}>
               <span
                 className="w-3 h-3 rounded-full flex-shrink-0 border border-gray-600"
                 style={{ backgroundColor: feature.color ?? '#ffffff' }}
               />
               <span className="font-mono font-semibold">{codigo}</span>
               {feature.capa && feature.capa !== codigo && (
-                <span className="ml-auto text-gray-500 truncate">{feature.capa}</span>
+                <span className="text-gray-500 truncate">{feature.capa}</span>
+              )}
+              {isViewer && (
+                <input
+                  type="checkbox"
+                  checked={visible}
+                  onChange={(e) => toggleVisibility(codigo, e.target.checked)}
+                  className="ml-auto w-4 h-4 accent-emerald-500 cursor-pointer"
+                  aria-label={`Mostrar capa ${codigo}`}
+                />
               )}
             </div>
           )

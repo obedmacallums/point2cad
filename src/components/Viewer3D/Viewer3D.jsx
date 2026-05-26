@@ -29,18 +29,35 @@ export default function Viewer3D() {
     return lib[codigo]?.color ?? '#60a5fa'
   }
 
+  function isVisible(codigo) {
+    return lib[codigo]?.visible !== false
+  }
+
+  const visiblePoints = useMemo(
+    () => points.filter((p) => isVisible(p.codigo)),
+    [points, lib], // eslint-disable-line
+  )
+  const visibleLines = useMemo(
+    () => lines.filter((l) => isVisible(l.codigo)),
+    [lines, lib], // eslint-disable-line
+  )
+  const visiblePolylines = useMemo(
+    () => polylines.filter((pl) => isVisible(pl.codigo)),
+    [polylines, lib], // eslint-disable-line
+  )
+
   // Centroide + spread → trasladar la escena al origen evita pérdida de precisión
   // Float32 cuando las coordenadas UTM están en el orden de 10^6
   const { originX, originY, spread, pointSize } = useMemo(() => {
     const allX = [
-      ...points.map((p) => p.x),
-      ...lines.flatMap((l) => l.vertices.map((v) => v[0])),
-      ...polylines.flatMap((pl) => pl.vertices.map((v) => v[0])),
+      ...visiblePoints.map((p) => p.x),
+      ...visibleLines.flatMap((l) => l.vertices.map((v) => v[0])),
+      ...visiblePolylines.flatMap((pl) => pl.vertices.map((v) => v[0])),
     ]
     const allY = [
-      ...points.map((p) => p.y),
-      ...lines.flatMap((l) => l.vertices.map((v) => v[1])),
-      ...polylines.flatMap((pl) => pl.vertices.map((v) => v[1])),
+      ...visiblePoints.map((p) => p.y),
+      ...visibleLines.flatMap((l) => l.vertices.map((v) => v[1])),
+      ...visiblePolylines.flatMap((pl) => pl.vertices.map((v) => v[1])),
     ]
 
     if (allX.length === 0) {
@@ -55,7 +72,7 @@ export default function Viewer3D() {
     const oy = (minY + maxY) / 2
     const s = Math.max(maxX - minX, maxY - minY, 10)
     return { originX: ox, originY: oy, spread: s, pointSize: s * 0.012 }
-  }, [points, lines, polylines])
+  }, [visiblePoints, visibleLines, visiblePolylines])
 
   // CSV (x=Este, y=Norte, z=Elevación) → Three.js (x, y=arriba, z=sur), trasladado al origen
   const toLocal = ([x, y, z]) => [x - originX, z, -(y - originY)]
@@ -63,13 +80,13 @@ export default function Viewer3D() {
   // Agrupar puntos por color para usar una sola InstancedMesh por color
   const pointsByColor = useMemo(() => {
     const groups = {}
-    for (const pt of points) {
+    for (const pt of visiblePoints) {
       const color = getColor(pt.codigo)
       if (!groups[color]) groups[color] = []
       groups[color].push(pt)
     }
     return groups
-  }, [points, lib]) // eslint-disable-line
+  }, [visiblePoints, lib]) // eslint-disable-line
 
   return (
     <Canvas
@@ -103,7 +120,7 @@ export default function Viewer3D() {
       ))}
 
       {/* Etiquetas (DOM): aceptable para cientos de puntos; con miles conviene troika-three-text */}
-      {points.map((pt) => {
+      {visiblePoints.map((pt) => {
         const [lx, ly, lz] = toLocal([pt.x, pt.y, pt.z])
         return (
           <Html
@@ -130,7 +147,7 @@ export default function Viewer3D() {
       })}
 
       {/* Líneas abiertas */}
-      {lines.map((line, i) => (
+      {visibleLines.map((line, i) => (
         <Line
           key={`line-${i}`}
           points={line.vertices.map(toLocal)}
@@ -140,7 +157,7 @@ export default function Viewer3D() {
       ))}
 
       {/* Polilíneas cerradas */}
-      {polylines.map((poly, i) => {
+      {visiblePolylines.map((poly, i) => {
         const pts = poly.vertices.map(toLocal)
         return (
           <Line
