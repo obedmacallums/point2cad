@@ -41,7 +41,16 @@ const BUTTONS = [
   },
 ]
 
-export default function ViewerToolbar({ onSetView }) {
+// Icono regla diagonal con marcas perpendiculares — para el botón de medición.
+const MEASURE_ICON = (
+  <path d="M3 17 L17 3 M5 13 L7 15 M9 9 L11 11 M13 5 L15 7" />
+)
+
+export default function ViewerToolbar({
+  onSetView,
+  measureActive = false,
+  onToggleMeasure,
+}) {
   return (
     <div className="absolute top-3 right-3 flex flex-col gap-px bg-gray-900/60 backdrop-blur-sm rounded p-px">
       {BUTTONS.map((btn) => (
@@ -67,6 +76,34 @@ export default function ViewerToolbar({ onSetView }) {
           </svg>
         </button>
       ))}
+
+      <div className="h-px bg-white/10 my-px" />
+
+      <button
+        type="button"
+        onClick={onToggleMeasure}
+        title="Medir entre puntos"
+        aria-label="Medir entre puntos"
+        aria-pressed={measureActive}
+        className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+          measureActive
+            ? 'text-white bg-white/10'
+            : 'text-gray-400 hover:text-white hover:bg-white/5'
+        }`}
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {MEASURE_ICON}
+        </svg>
+      </button>
     </div>
   )
 }
