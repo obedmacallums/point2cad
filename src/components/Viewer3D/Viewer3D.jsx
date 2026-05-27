@@ -70,7 +70,7 @@ function CameraRig({ spread, controlsRef, cameraRef }) {
 
 export default function Viewer3D() {
   const { state } = useApp()
-  const { points, lines, polylines, featureLibrary } = state
+  const { points, lines, polylines, featureLibrary, showLineVertices } = state
   const controlsRef = useRef()
   const cameraRef = useRef()
   const [selectedPoint, setSelectedPoint] = useState(null)
@@ -129,12 +129,41 @@ export default function Viewer3D() {
   // CSV (x=Este, y=Norte, z=Elevación) → Three.js (x, y=arriba, z=sur), trasladado al origen
   const toLocal = ([x, y, z]) => [x - originX, z, -(y - originY)]
 
+  // Puntos sintéticos derivados de los vértices de líneas/polilíneas visibles.
+  // Solo se generan cuando el toggle "Mostrar vértices de líneas" está ON.
+  // Comparten color y agrupamiento con los standalone → entran al mismo <points>.
+  const syntheticVertices = useMemo(() => {
+    if (!showLineVertices) return []
+    const out = []
+    for (const line of visibleLines) {
+      for (const v of line.vertices) {
+        out.push({
+          x: v[0], y: v[1], z: v[2],
+          codigo: line.codigo,
+          nombre: null,
+          isVertex: true,
+        })
+      }
+    }
+    for (const pl of visiblePolylines) {
+      for (const v of pl.vertices) {
+        out.push({
+          x: v[0], y: v[1], z: v[2],
+          codigo: pl.codigo,
+          nombre: null,
+          isVertex: true,
+        })
+      }
+    }
+    return out
+  }, [showLineVertices, visibleLines, visiblePolylines])
+
   // Agrupar puntos por color y construir un Float32Array de posiciones por grupo.
   // Cada grupo se renderiza como un único <points> (1 draw call) con
   // PointsMaterial(sizeAttenuation:false) → tamaño constante en pantalla.
   const pointBuffers = useMemo(() => {
     const groups = {}
-    for (const pt of visiblePoints) {
+    for (const pt of [...visiblePoints, ...syntheticVertices]) {
       const color = getColor(pt.codigo)
       if (!groups[color]) groups[color] = []
       groups[color].push(pt)
@@ -149,7 +178,7 @@ export default function Viewer3D() {
       }
       return { color, pts, positions }
     })
-  }, [visiblePoints, lib, originX, originY]) // eslint-disable-line
+  }, [visiblePoints, syntheticVertices, lib, originX, originY]) // eslint-disable-line
 
   const setView = useCallback(
     (view) => {
@@ -275,7 +304,7 @@ export default function Viewer3D() {
                 }}
               >
                 <div style={{ fontWeight: 600, marginBottom: 2 }}>
-                  {selectedPoint.nombre}
+                  {selectedPoint.nombre ?? 'Vértice'}
                 </div>
                 <div style={{ opacity: 0.7 }}>{selectedPoint.codigo}</div>
                 <div style={{ marginTop: 6, opacity: 0.85 }}>

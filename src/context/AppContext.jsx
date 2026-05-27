@@ -34,6 +34,10 @@ const initialState = {
   lines: [],
   polylines: [],
 
+  // Toggle del viewer 3D: si true, los vértices de líneas/polilíneas se
+  // muestran como dots adicionales. Se resetea a false al entrar al viewer.
+  showLineVertices: false,
+
   isProcessing: false,
   error: null,
   fileName: null,
@@ -141,10 +145,18 @@ function reducer(state, action) {
             { ...feature, visible: true },
           ]),
         )
-        return { ...state, appMode: 'viewer', featureLibrary: resetLibrary }
+        return {
+          ...state,
+          appMode: 'viewer',
+          featureLibrary: resetLibrary,
+          showLineVertices: false,
+        }
       }
       return { ...state, appMode: action.payload }
     }
+
+    case 'SET_SHOW_LINE_VERTICES':
+      return { ...state, showLineVertices: action.payload }
 
     case 'SET_ERROR': {
       // Volver al último estado seguro según la fase donde ocurrió el error

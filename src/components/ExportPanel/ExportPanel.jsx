@@ -28,6 +28,44 @@ export default function ExportPanel() {
       )
     : state.featureLibrary
 
+  // Cuando el viewer 3D tiene activado "Mostrar vértices de líneas", también
+  // exportamos los vértices al DXF como POINT en una sub-capa con sufijo _VERT
+  // (BORDE → BORDE_VERT). Cada nuevo código hereda el color de la línea padre.
+  // nombre: '' evita que dxf_generator agregue TEXT por cada vértice.
+  const showVertices = isViewer && state.showLineVertices === true
+
+  let exportPoints = points
+  let exportFeatureLibrary = featureLibrary
+
+  if (showVertices) {
+    const vertexPoints = []
+    const vertexCodes = {}
+    const addVertices = (entity) => {
+      const parent = state.featureLibrary[entity.codigo]
+      if (!parent) return
+      const vertCode = `${entity.codigo}_VERT`
+      if (!(vertCode in vertexCodes)) {
+        vertexCodes[vertCode] = {
+          color: parent.color,
+          capa: `${parent.capa ?? entity.codigo}_VERT`,
+        }
+      }
+      for (const v of entity.vertices) {
+        vertexPoints.push({
+          x: v[0],
+          y: v[1],
+          z: v[2],
+          codigo: vertCode,
+          nombre: '',
+        })
+      }
+    }
+    for (const line of lines) addVertices(line)
+    for (const pl of polylines) addVertices(pl)
+    exportPoints = [...points, ...vertexPoints]
+    exportFeatureLibrary = { ...featureLibrary, ...vertexCodes }
+  }
+
   const hasGeometry =
     points.length > 0 || lines.length > 0 || polylines.length > 0
 
@@ -39,8 +77,12 @@ export default function ExportPanel() {
   if (!hasAnyGeometry) return null
 
   async function handleExport() {
-    const geometry = { points, lines, polylines }
-    await exportDXF(geometry, featureLibrary, state.fileName ?? 'output.csv')
+    const geometry = { points: exportPoints, lines, polylines }
+    await exportDXF(
+      geometry,
+      exportFeatureLibrary,
+      state.fileName ?? 'output.csv',
+    )
   }
 
   const label = isRunning

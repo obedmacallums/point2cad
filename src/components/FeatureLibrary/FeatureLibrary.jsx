@@ -14,6 +14,10 @@ export default function FeatureLibrary() {
     })
   }
 
+  function toggleLineVertices(checked) {
+    dispatch({ type: 'SET_SHOW_LINE_VERTICES', payload: checked })
+  }
+
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-sm font-semibold uppercase text-gray-400">
@@ -49,6 +53,19 @@ export default function FeatureLibrary() {
             </div>
           )
         })}
+
+        {isViewer && (
+          <label className="flex items-center gap-2 bg-gray-800 rounded px-2 py-1 mt-1 cursor-pointer">
+            <span className="text-gray-300">Mostrar vértices de líneas</span>
+            <input
+              type="checkbox"
+              checked={state.showLineVertices === true}
+              onChange={(e) => toggleLineVertices(e.target.checked)}
+              className="ml-auto w-4 h-4 accent-emerald-500 cursor-pointer"
+              aria-label="Mostrar vértices de líneas"
+            />
+          </label>
+        )}
       </div>
     </section>
   )

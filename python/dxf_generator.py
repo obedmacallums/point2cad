@@ -52,10 +52,13 @@ def generate_dxf(geometry: dict, feature_library: dict) -> str:
             (pt["x"], pt["y"], pt["z"]),
             dxfattribs={"layer": capa},
         )
-        msp.add_text(
-            pt["nombre"],
-            dxfattribs={"layer": capa, "height": 0.5},
-        ).set_placement((pt["x"], pt["y"], pt["z"]))
+        # Etiqueta solo si hay nombre — los vértices de líneas exportados
+        # desde el viewer 3D vienen sin nombre para no llenar el DXF de TEXT.
+        if pt.get("nombre"):
+            msp.add_text(
+                pt["nombre"],
+                dxfattribs={"layer": capa, "height": 0.5},
+            ).set_placement((pt["x"], pt["y"], pt["z"]))
 
     # Líneas (POLYLINE 3D para preservar Z por vértice)
     for line in geometry.get("lines", []):
