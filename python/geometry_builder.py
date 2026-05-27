@@ -14,9 +14,13 @@ Soporta el formato Trimble Access:
 Devuelve:
   {
     "points":    [{nombre, x, y, z, codigo}, ...],
-    "lines":     [{codigo, vertices: [[x,y,z], ...]}, ...],
-    "polylines": [{codigo, vertices: [[x,y,z], ...]}, ...],
+    "lines":     [{codigo, vertices: [[x,y,z], ...], vertex_names: [str, ...]}, ...],
+    "polylines": [{codigo, vertices: [[x,y,z], ...], vertex_names: [str, ...]}, ...],
   }
+
+vertex_names guarda el nombre original del punto CSV en cada vértice (mismo
+índice que vertices), para que el viewer 3D pueda mostrarlo al inspeccionar
+un vértice.
 
 Las claves "codigo" en la salida son SIEMPRE el código base (sin string number),
 de modo que el lookup contra feature_library funciona uniformemente.
@@ -36,7 +40,10 @@ def build_geometry(points: list[dict], feature_library: dict) -> dict:
         if len(seq) >= 2:
             base = key[0]
             vertices = [[p["x"], p["y"], p["z"]] for p in seq]
-            result["lines"].append({"codigo": base, "vertices": vertices})
+            names = [p["nombre"] for p in seq]
+            result["lines"].append(
+                {"codigo": base, "vertices": vertices, "vertex_names": names}
+            )
         elif len(seq) == 1:
             result["points"].append(seq[0])
 
@@ -67,7 +74,10 @@ def build_geometry(points: list[dict], feature_library: dict) -> dict:
                 seq = active.pop(key)
                 seq.append(pt_norm)
                 vertices = [[p["x"], p["y"], p["z"]] for p in seq]
-                result["lines"].append({"codigo": base, "vertices": vertices})
+                names = [p["nombre"] for p in seq]
+                result["lines"].append(
+                    {"codigo": base, "vertices": vertices, "vertex_names": names}
+                )
             else:
                 result["points"].append(pt_norm)
 
@@ -76,7 +86,10 @@ def build_geometry(points: list[dict], feature_library: dict) -> dict:
                 seq = active.pop(key)
                 seq.append(pt_norm)
                 vertices = [[p["x"], p["y"], p["z"]] for p in seq]
-                result["polylines"].append({"codigo": base, "vertices": vertices})
+                names = [p["nombre"] for p in seq]
+                result["polylines"].append(
+                    {"codigo": base, "vertices": vertices, "vertex_names": names}
+                )
             else:
                 # CLOSE sin sequence: tratar como punto
                 result["points"].append(pt_norm)

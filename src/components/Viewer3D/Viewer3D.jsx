@@ -158,29 +158,27 @@ export default function Viewer3D() {
   // Puntos sintéticos derivados de los vértices de líneas/polilíneas visibles.
   // Solo se generan cuando el toggle "Mostrar vértices de líneas" está ON.
   // Comparten color y agrupamiento con los standalone → entran al mismo <points>.
+  // vertex_names viene paralelo a vertices desde geometry_builder.py → cada
+  // vértice conserva el nombre del punto CSV original (P5, P12, etc.).
   const syntheticVertices = useMemo(() => {
     if (!showLineVertices) return []
     const out = []
-    for (const line of visibleLines) {
-      for (const v of line.vertices) {
+    const collect = (entity) => {
+      const names = entity.vertex_names ?? []
+      for (let i = 0; i < entity.vertices.length; i++) {
+        const v = entity.vertices[i]
         out.push({
-          x: v[0], y: v[1], z: v[2],
-          codigo: line.codigo,
-          nombre: null,
+          x: v[0],
+          y: v[1],
+          z: v[2],
+          codigo: entity.codigo,
+          nombre: names[i] ?? null,
           isVertex: true,
         })
       }
     }
-    for (const pl of visiblePolylines) {
-      for (const v of pl.vertices) {
-        out.push({
-          x: v[0], y: v[1], z: v[2],
-          codigo: pl.codigo,
-          nombre: null,
-          isVertex: true,
-        })
-      }
-    }
+    for (const line of visibleLines) collect(line)
+    for (const pl of visiblePolylines) collect(pl)
     return out
   }, [showLineVertices, visibleLines, visiblePolylines])
 
