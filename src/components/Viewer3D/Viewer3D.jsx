@@ -125,8 +125,10 @@ export default function Viewer3D() {
   )
 
   // Centroide + spread → trasladar la escena al origen evita pérdida de precisión
-  // Float32 cuando las coordenadas UTM están en el orden de 10^6
-  const { originX, originY, spread, pointSize } = useMemo(() => {
+  // Float32 cuando las coordenadas UTM están en el orden de 10^6. Z también se
+  // centra: cotas absolutas tipo 2050 m harían que la grilla (en y=0) quedara
+  // 2050 m debajo de los puntos y las vistas top/fit no encuadraran nada.
+  const { originX, originY, originZ, spread, pointSize } = useMemo(() => {
     const allX = [
       ...visiblePoints.map((p) => p.x),
       ...visibleLines.flatMap((l) => l.vertices.map((v) => v[0])),
@@ -137,23 +139,31 @@ export default function Viewer3D() {
       ...visibleLines.flatMap((l) => l.vertices.map((v) => v[1])),
       ...visiblePolylines.flatMap((pl) => pl.vertices.map((v) => v[1])),
     ]
+    const allZ = [
+      ...visiblePoints.map((p) => p.z),
+      ...visibleLines.flatMap((l) => l.vertices.map((v) => v[2])),
+      ...visiblePolylines.flatMap((pl) => pl.vertices.map((v) => v[2])),
+    ]
 
     if (allX.length === 0) {
-      return { originX: 0, originY: 0, spread: 10, pointSize: 0.12 }
+      return { originX: 0, originY: 0, originZ: 0, spread: 10, pointSize: 0.12 }
     }
 
     const minX = Math.min(...allX)
     const maxX = Math.max(...allX)
     const minY = Math.min(...allY)
     const maxY = Math.max(...allY)
+    const minZ = Math.min(...allZ)
+    const maxZ = Math.max(...allZ)
     const ox = (minX + maxX) / 2
     const oy = (minY + maxY) / 2
+    const oz = (minZ + maxZ) / 2
     const s = Math.max(maxX - minX, maxY - minY, 10)
-    return { originX: ox, originY: oy, spread: s, pointSize: s * 0.012 }
+    return { originX: ox, originY: oy, originZ: oz, spread: s, pointSize: s * 0.012 }
   }, [visiblePoints, visibleLines, visiblePolylines])
 
   // CSV (x=Este, y=Norte, z=Elevación) → Three.js (x, y=arriba, z=sur), trasladado al origen
-  const toLocal = ([x, y, z]) => [x - originX, z, -(y - originY)]
+  const toLocal = ([x, y, z]) => [x - originX, z - originZ, -(y - originY)]
 
   // Puntos sintéticos derivados de los vértices de líneas/polilíneas visibles.
   // Solo se generan cuando el toggle "Mostrar vértices de líneas" está ON.
