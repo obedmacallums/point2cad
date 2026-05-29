@@ -29,7 +29,7 @@ print(_json.dumps({"type": "codes", "data": codes}))
 
       if (stderr) {
         dispatch({ type: 'SET_ERROR', payload: stderr })
-        return
+        return null
       }
 
       for (const line of stdout.split('\n').filter(Boolean)) {
@@ -42,11 +42,15 @@ print(_json.dumps({"type": "codes", "data": codes}))
               type: 'SET_CODES_DETECTED',
               payload: { codesSummary, featureLibrary },
             })
+            // Devolvemos el resultado para poder encadenar (p.ej. saltar
+            // directo a "Procesar" desde el stepper).
+            return { codesSummary, featureLibrary }
           }
         } catch {
           // línea no-JSON, ignorar
         }
       }
+      return null
     },
     [runPython, dispatch]
   )
@@ -74,7 +78,7 @@ print(_json.dumps({"type": "geometry", "data": geometry}))
 
       if (stderr) {
         dispatch({ type: 'SET_ERROR', payload: stderr })
-        return
+        return null
       }
 
       for (const line of stdout.split('\n').filter(Boolean)) {
@@ -82,11 +86,13 @@ print(_json.dumps({"type": "geometry", "data": geometry}))
           const result = JSON.parse(line)
           if (result.type === 'geometry') {
             dispatch({ type: 'SET_GEOMETRY', payload: result.data })
+            return result.data
           }
         } catch {
           // línea no-JSON, ignorar
         }
       }
+      return null
     },
     [runPython, dispatch]
   )

@@ -1,10 +1,11 @@
-import { createContext, useContext, useReducer } from 'react'
+import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import {
   autoDetectMapping,
   parseCSVPreview,
   DEFAULT_PARSE_OPTIONS,
   REQUIRED_FIELDS,
 } from '../utils/csvLoader'
+import { saveSession } from '../utils/sessionStorage'
 
 const AppContext = createContext(null)
 
@@ -98,6 +99,14 @@ function reducer(state, action) {
           ...state.columnMapping,
           [action.payload.field]: action.payload.column,
         },
+        // Cambiar el mapeo invalida todo lo que viene después (igual que
+        // SET_PARSE_OPTIONS). La ausencia de codesSummary/geometría sirve como
+        // señal de que hay que volver a detectar/procesar al avanzar.
+        codesSummary: [],
+        featureLibrary: {},
+        points: [],
+        lines: [],
+        polylines: [],
       }
 
     case 'SET_DETECTING':
@@ -169,6 +178,46 @@ function reducer(state, action) {
       return { ...state, error: action.payload, isProcessing: false, appMode: fallback }
     }
 
+    case 'RESTORE_SESSION': {
+      const saved = action.payload
+      // Sin CSV guardado no podemos reconstruir el flujo: empezamos limpio.
+      if (!saved || !saved.rawCSVText) return initialState
+
+      const parseOptions = {
+        ...DEFAULT_PARSE_OPTIONS,
+        ...(saved.parseOptions ?? {}),
+      }
+
+      let csvHeaders = []
+      let rawCSVRows = []
+      try {
+        const parsed = parseCSVPreview(saved.rawCSVText, parseOptions)
+        csvHeaders = parsed.headers
+        rawCSVRows = parsed.rows
+      } catch {
+        return initialState
+      }
+
+      return {
+        ...initialState,
+        appMode: saved.appMode ?? 'preview',
+        rawCSVText: saved.rawCSVText,
+        rawCSVRows,
+        csvHeaders,
+        parseOptions,
+        // Preservamos el mapeo guardado en lugar de re-autodetectarlo.
+        columnMapping: saved.columnMapping ?? emptyMapping(),
+        codesSummary: saved.codesSummary ?? [],
+        featureLibrary: saved.featureLibrary ?? {},
+        fileName: saved.fileName ?? null,
+        showLineVertices: saved.showLineVertices ?? false,
+        // La geometría se regenera con useSessionRehydration.
+        points: [],
+        lines: [],
+        polylines: [],
+      }
+    }
+
     case 'RESET':
       return initialState
 
@@ -179,6 +228,29 @@ function reducer(state, action) {
 
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState)
+
+  // Persistencia automática: guarda el subconjunto serializable del state cada
+  // vez que cambia un campo relevante. saveSession limpia localStorage en idle.
+  // Se salta la primera ejecución (montaje) para no borrar la sesión guardada
+  // antes de que el usuario decida si la restaura.
+  const isFirstRun = useRef(true)
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false
+      return
+    }
+    saveSession(state)
+  }, [
+    state.appMode,
+    state.rawCSVText,
+    state.parseOptions,
+    state.columnMapping,
+    state.codesSummary,
+    state.featureLibrary,
+    state.fileName,
+    state.showLineVertices,
+  ])
+
   return (
     <AppContext.Provider value={{ state, dispatch }}>
       {children}

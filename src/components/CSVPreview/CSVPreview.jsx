@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { useApp } from '../../context/AppContext'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
-import { REQUIRED_FIELDS, buildCanonicalCSV, validateRows } from '../../utils/csvLoader'
+import { REQUIRED_FIELDS, buildCanonicalCSV, validateRows, normalizeNumber } from '../../utils/csvLoader'
 import DataTable from '../DataTable/DataTable'
 import ColorPicker from '../ColorPicker/ColorPicker'
 
@@ -90,6 +90,10 @@ export default function CSVPreview() {
   const isProcessing = state.appMode === 'processing' || state.isProcessing
   const busy = isRunning || isDetecting || isProcessing
 
+  // En Detectar/Procesar se muestra la tabla canónica (columnas ya mapeadas).
+  const isCanonicalView =
+    state.appMode === 'codes_ready' || state.appMode === 'processing'
+
   // Mapa inverso: header del CSV → campo requerido al que está mapeado (o undefined).
   const headerToField = useMemo(() => {
     const map = {}
@@ -135,6 +139,38 @@ export default function CSVPreview() {
         : state.rawCSVRows.slice(0, previewRowsCount),
     [state.rawCSVRows, previewRowsCount]
   )
+
+  // Vista canónica (etapas Detectar/Procesar): solo las columnas ya mapeadas
+  // nombre/x/y/z/codigo, con los valores extraídos según el mapeo.
+  const canonicalColumns = useMemo(
+    () =>
+      REQUIRED_FIELDS.map((field) =>
+        colHelper.accessor(field, {
+          header: () => <span>{FIELD_LABELS[field]}</span>,
+          cell: (info) => String(info.getValue() ?? ''),
+        })
+      ),
+    []
+  )
+
+  const canonicalRows = useMemo(() => {
+    const dec = state.parseOptions.decimalSeparator
+    const numeric = new Set(['x', 'y', 'z'])
+    const mapped = state.rawCSVRows.map((row) => {
+      const obj = {}
+      for (const field of REQUIRED_FIELDS) {
+        const col = state.columnMapping[field]
+        const raw = col ? row[col] ?? '' : ''
+        if (numeric.has(field)) {
+          obj[field] = normalizeNumber(raw, dec) ?? String(raw)
+        } else {
+          obj[field] = String(raw)
+        }
+      }
+      return obj
+    })
+    return previewRowsCount === -1 ? mapped : mapped.slice(0, previewRowsCount)
+  }, [state.rawCSVRows, state.columnMapping, state.parseOptions, previewRowsCount])
 
   // Validación del mapping
   const mappingValues = REQUIRED_FIELDS.map((f) => state.columnMapping[f])
@@ -252,7 +288,8 @@ export default function CSVPreview() {
         <div>
           <h2 className="text-base font-semibold text-white">{state.fileName}</h2>
           <p className="text-sm text-gray-400 mt-0.5">
-            {state.rawCSVRows.length.toLocaleString()} filas · {state.csvHeaders.length} columnas
+            {state.rawCSVRows.length.toLocaleString()} filas ·{' '}
+            {isCanonicalView ? REQUIRED_FIELDS.length : state.csvHeaders.length} columnas
           </p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
@@ -303,8 +340,8 @@ export default function CSVPreview() {
           </div>
         </div>
         <DataTable
-          columns={previewColumns}
-          data={previewRows}
+          columns={isCanonicalView ? canonicalColumns : previewColumns}
+          data={isCanonicalView ? canonicalRows : previewRows}
           maxHeight={previewRowsCount === -1 || previewRowsCount > 10 ? '420px' : '220px'}
         />
       </section>
@@ -490,8 +527,10 @@ export default function CSVPreview() {
         </section>
       )}
 
-      {/* Códigos detectados — solo después de detectar */}
-      {state.codesSummary.length > 0 && (
+      {/* Códigos detectados — solo en las etapas Detectar/Procesar, no al
+          volver a Importar (preview/detecting) */}
+      {(state.appMode === 'codes_ready' || state.appMode === 'processing') &&
+        state.codesSummary.length > 0 && (
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">

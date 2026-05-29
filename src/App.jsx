@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useApp } from './context/AppContext'
 import FileUpload from './components/FileUpload/FileUpload'
 import Viewer3D from './components/Viewer3D/Viewer3D'
@@ -6,9 +7,13 @@ import ResultsPanel from './components/ResultsPanel/ResultsPanel'
 import FeatureLibrary from './components/FeatureLibrary/FeatureLibrary'
 import ExportPanel from './components/ExportPanel/ExportPanel'
 import IdleDropZone from './components/IdleDropZone/IdleDropZone'
+import StageStepper from './components/StageStepper/StageStepper'
+import ResumeSessionModal from './components/ResumeSessionModal/ResumeSessionModal'
+import { useSessionRehydration } from './hooks/useSessionRehydration'
+import { loadSession, clearSession } from './utils/sessionStorage'
 
 function MainArea() {
-  const { state, dispatch } = useApp()
+  const { state } = useApp()
 
   switch (state.appMode) {
     case 'preview':
@@ -28,8 +33,39 @@ function MainArea() {
   }
 }
 
+function RehydratingOverlay() {
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-gray-950/80 backdrop-blur-sm">
+      <div className="w-10 h-10 border-2 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+      <p className="text-sm text-gray-300">Restaurando sesión…</p>
+    </div>
+  )
+}
+
 export default function App() {
   const { state, dispatch } = useApp()
+
+  // Lee la sesión guardada de forma síncrona en el primer render, antes de que
+  // cualquier efecto pueda modificar localStorage.
+  const [pendingSession, setPendingSession] = useState(() => {
+    const saved = loadSession()
+    return saved && saved.appMode && saved.appMode !== 'idle' && saved.rawCSVText
+      ? saved
+      : null
+  })
+
+  // Regenera la geometría si la sesión restaurada estaba en 'ready'/'viewer'.
+  const isRehydrating = useSessionRehydration()
+
+  function handleContinue() {
+    dispatch({ type: 'RESTORE_SESSION', payload: pendingSession })
+    setPendingSession(null)
+  }
+
+  function handleDiscard() {
+    clearSession()
+    setPendingSession(null)
+  }
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
@@ -48,9 +84,23 @@ export default function App() {
         <ExportPanel />
       </aside>
 
-      <main className="flex-1 min-w-0 bg-gray-950">
-        <MainArea />
+      <main className="flex-1 min-w-0 flex flex-col bg-gray-950">
+        {state.appMode !== 'idle' && <StageStepper />}
+        <div className="flex-1 min-h-0">
+          <MainArea />
+        </div>
       </main>
+
+      {pendingSession && (
+        <ResumeSessionModal
+          fileName={pendingSession.fileName}
+          appMode={pendingSession.appMode}
+          onContinue={handleContinue}
+          onDiscard={handleDiscard}
+        />
+      )}
+
+      {isRehydrating && <RehydratingOverlay />}
     </div>
   )
 }

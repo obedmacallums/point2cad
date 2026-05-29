@@ -13,43 +13,52 @@ export default function ResultsPanel() {
   ]
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-8 bg-gray-950 p-8">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mb-2">
-          <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+    <div className="flex flex-col gap-6 p-6 h-full bg-gray-950">
+      {/* Encabezado con acciones a la derecha (mismo patrón que CSVPreview) */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold text-white">{state.fileName}</h2>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {totalGeometry} entidades generadas
+          </p>
         </div>
-        <h2 className="text-xl font-semibold text-white">{state.fileName}</h2>
-        <p className="text-sm text-gray-400">
-          {totalGeometry} entidades generadas
-        </p>
+        <div className="flex gap-2 flex-shrink-0">
+          <button
+            onClick={() => dispatch({ type: 'RESET' })}
+            className="px-3 py-1.5 rounded text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'SET_MODE', payload: 'viewer' })}
+            className="px-4 py-1.5 rounded text-sm font-medium bg-blue-600 hover:bg-blue-500 transition-colors"
+          >
+            Ver en 3D
+          </button>
+        </div>
       </div>
 
-      {/* Resumen de geometría */}
-      <div className="flex gap-6">
-        {stats.map(({ label, value, color }) => (
-          <div key={label} className="flex flex-col items-center gap-1 bg-gray-800 rounded-xl px-6 py-4 min-w-[100px]">
-            <span className={`text-3xl font-bold tabular-nums ${color}`}>{value}</span>
-            <span className="text-xs text-gray-400">{label}</span>
+      {/* Resumen de geometría, centrado */}
+      <div className="flex flex-1 flex-col items-center justify-center gap-8">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
+            <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
-        ))}
-      </div>
+          <p className="text-sm text-gray-300">
+            {totalGeometry} entidades generadas
+          </p>
+        </div>
 
-      {/* Acciones */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => dispatch({ type: 'RESET' })}
-          className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 transition-colors"
-        >
-          Cargar otro archivo
-        </button>
-        <button
-          onClick={() => dispatch({ type: 'SET_MODE', payload: 'viewer' })}
-          className="px-6 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-500 transition-colors"
-        >
-          Ver en 3D
-        </button>
+        <div className="flex gap-6">
+          {stats.map(({ label, value, color }) => (
+            <div key={label} className="flex flex-col items-center gap-1 bg-gray-800 rounded-xl px-6 py-4 min-w-[100px]">
+              <span className={`text-3xl font-bold tabular-nums ${color}`}>{value}</span>
+              <span className="text-xs text-gray-400">{label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
