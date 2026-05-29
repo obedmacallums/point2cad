@@ -1,5 +1,33 @@
 import { useApp } from '../../context/AppContext'
 
+// Iconos minimalistas que representan cada tipo de entidad geométrica.
+function PointIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="7" opacity="0.4" />
+    </svg>
+  )
+}
+
+function LineIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 17 L10 8 L15 14 L20 6" />
+      <circle cx="4" cy="17" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="20" cy="6" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function PolygonIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 4 L19 9 L16 18 L8 18 L5 9 Z" />
+    </svg>
+  )
+}
+
 export default function ResultsPanel() {
   const { state, dispatch } = useApp()
 
@@ -7,9 +35,9 @@ export default function ResultsPanel() {
     state.points.length + state.lines.length + state.polylines.length
 
   const stats = [
-    { label: 'Puntos', value: state.points.length, color: 'text-green-400' },
-    { label: 'Líneas', value: state.lines.length, color: 'text-yellow-400' },
-    { label: 'Polilíneas cerradas', value: state.polylines.length, color: 'text-purple-400' },
+    { label: 'Puntos', value: state.points.length, color: 'text-green-400', Icon: PointIcon },
+    { label: 'Líneas', value: state.lines.length, color: 'text-yellow-400', Icon: LineIcon },
+    { label: 'Polilíneas cerradas', value: state.polylines.length, color: 'text-purple-400', Icon: PolygonIcon },
   ]
 
   return (
@@ -41,19 +69,20 @@ export default function ResultsPanel() {
       {/* Resumen de geometría, centrado */}
       <div className="flex flex-1 flex-col items-center justify-center gap-8">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center animate-check-pop">
             <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <p className="text-sm text-gray-300">
+          <p className="text-sm text-gray-300 animate-fade-up">
             {totalGeometry} entidades generadas
           </p>
         </div>
 
         <div className="flex gap-6">
-          {stats.map(({ label, value, color }) => (
-            <div key={label} className="flex flex-col items-center gap-1 bg-gray-800 rounded-xl px-6 py-4 min-w-[100px]">
+          {stats.map(({ label, value, color, Icon }) => (
+            <div key={label} className="flex flex-col items-center gap-2 bg-gray-800 rounded-xl px-6 py-4 min-w-[110px]">
+              <Icon className={`w-6 h-6 ${color} opacity-80`} />
               <span className={`text-3xl font-bold tabular-nums ${color}`}>{value}</span>
               <span className="text-xs text-gray-400">{label}</span>
             </div>

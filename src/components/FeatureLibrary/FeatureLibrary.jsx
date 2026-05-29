@@ -39,7 +39,10 @@ export default function FeatureLibrary() {
               />
               <span className="font-mono font-semibold">{codigo}</span>
               {feature.capa && feature.capa !== codigo && (
-                <span className="text-gray-500 truncate">{feature.capa}</span>
+                <>
+                  <span className="text-gray-600 flex-shrink-0">&gt;</span>
+                  <span className="text-gray-500 truncate">{feature.capa}</span>
+                </>
               )}
               {isViewer && (
                 <input
