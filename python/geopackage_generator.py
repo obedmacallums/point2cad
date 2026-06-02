@@ -46,6 +46,9 @@ def generate_geopackage_b64(geometry: dict, feature_library: dict, options: dict
     lines = geometry.get("lines", [])
     polylines = geometry.get("polylines", [])
 
+    # A diferencia de los otros generadores (que emiten un archivo vacío), un
+    # GeoPackage requiere al menos una capa: geopandas no puede crear un .gpkg
+    # sin features. La UI ya impide llegar aquí sin geometría (botón deshabilitado).
     if not points and not lines and not polylines:
         raise ValueError("geometry contains no features to export")
 
