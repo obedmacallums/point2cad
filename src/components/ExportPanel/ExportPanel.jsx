@@ -1,9 +1,19 @@
+import { useState } from 'react'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
 import { useApp } from '../../context/AppContext'
 
+// Formatos disponibles en el desplegable (DXF queda por defecto).
+const FORMAT_OPTIONS = [
+  { value: 'dxf', label: 'DXF' },
+  { value: 'geojson', label: 'GeoJSON' },
+  { value: 'shapefile', label: 'Shapefile (ZIP)' },
+]
+
 export default function ExportPanel() {
-  const { exportDXF, isRunning } = usePythonBridge()
+  const { exportGeometry, isRunning } = usePythonBridge()
   const { state } = useApp()
+  const [format, setFormat] = useState('dxf')
+  const [includeLabels, setIncludeLabels] = useState(true)
 
   const isViewer = state.appMode === 'viewer'
 
@@ -78,21 +88,56 @@ export default function ExportPanel() {
 
   async function handleExport() {
     const geometry = { points: exportPoints, lines, polylines }
-    await exportDXF(
+    await exportGeometry(
+      format,
       geometry,
       exportFeatureLibrary,
       state.fileName ?? 'output.csv',
+      { include_labels: includeLabels },
     )
   }
 
+  const formatLabel =
+    FORMAT_OPTIONS.find((o) => o.value === format)?.label ?? 'DXF'
   const label = isRunning
-    ? 'Generando DXF…'
+    ? `Generando ${formatLabel}…`
     : isViewer
       ? 'Exportar selección'
-      : 'Exportar DXF'
+      : `Exportar ${formatLabel}`
 
   return (
     <section className="flex flex-col gap-2 mt-auto">
+      <label className="flex flex-col gap-1 text-xs text-gray-400">
+        Formato de exportación
+        <select
+          value={format}
+          onChange={(e) => setFormat(e.target.value)}
+          disabled={isRunning}
+          className="w-full py-1.5 px-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 cursor-pointer"
+        >
+          {FORMAT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {/* La casilla solo aplica a DXF, pero se reserva su espacio siempre
+          (invisible en otros formatos) para que el panel no salte al cambiar. */}
+      <label
+        className={`flex items-center gap-2 text-xs text-gray-300 cursor-pointer ${
+          format === 'dxf' ? '' : 'invisible'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={includeLabels}
+          onChange={(e) => setIncludeLabels(e.target.checked)}
+          disabled={isRunning || format !== 'dxf'}
+          className="accent-emerald-500"
+        />
+        Incluir etiquetas de nombre
+      </label>
       <button
         onClick={handleExport}
         disabled={isRunning || !hasGeometry}

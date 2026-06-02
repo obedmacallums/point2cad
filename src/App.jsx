@@ -74,14 +74,16 @@ export default function App() {
         <FileUpload />
         <FeatureLibrary />
         {state.appMode === 'viewer' && (
-          <button
-            onClick={() => dispatch({ type: 'SET_MODE', payload: 'ready' })}
-            className="w-full py-2 px-3 rounded border border-gray-700 hover:border-gray-500 text-sm text-gray-400 hover:text-white transition-colors"
-          >
-            ← Volver al resumen
-          </button>
+          <>
+            <button
+              onClick={() => dispatch({ type: 'SET_MODE', payload: 'ready' })}
+              className="w-full py-2 px-3 rounded border border-gray-700 hover:border-gray-500 text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              ← Volver al resumen
+            </button>
+            <ExportPanel />
+          </>
         )}
-        <ExportPanel />
       </aside>
 
       <main className="flex-1 min-w-0 flex flex-col bg-gray-950">

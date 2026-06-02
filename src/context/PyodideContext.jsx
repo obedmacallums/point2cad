@@ -30,6 +30,7 @@ export function PyodideProvider({ children }) {
       await py.loadPackage('micropip')
       const micropip = py.pyimport('micropip')
       await micropip.install('ezdxf')
+      await micropip.install('pyshp')
 
       pyRef.current = py
       setIsLoading(false)
