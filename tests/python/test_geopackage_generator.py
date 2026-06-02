@@ -75,3 +75,12 @@ def test_options_arg_is_accepted():
     # Firma uniforme con los demás generadores; no debe fallar al recibir options.
     out = generate_geopackage_b64(GEOMETRY, FEATURE_LIBRARY, {"include_labels": False})
     assert isinstance(out, str) and len(out) > 0
+
+
+def test_lines_z_is_preserved():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _write_gpkg(tmp)
+        gdf = gpd.read_file(path, layer="lines")
+    geom = gdf.geometry.iloc[0]
+    assert geom.has_z
+    assert len(list(geom.coords)) == 3

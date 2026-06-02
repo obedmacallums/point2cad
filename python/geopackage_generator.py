@@ -13,7 +13,8 @@ por tipo de geometría presente (conservando Z, como el DXF/Shapefile 3D):
 No se asigna CRS (crs=None): las coordenadas son UTM planas y el sistema de
 referencia se define al abrir el archivo en el SIG.
 
-Atributos: codigo, capa (y nombre solo en puntos).
+Atributos: codigo, capa (y nombre solo en puntos). El atributo color se excluye
+intencionalmente para mantener uniformidad con el generador de Shapefile.
 
 Entrada : geometry (dict) — salida de geometry_builder
           feature_library (dict) — mapa de códigos
@@ -45,6 +46,9 @@ def generate_geopackage_b64(geometry: dict, feature_library: dict, options: dict
     lines = geometry.get("lines", [])
     polylines = geometry.get("polylines", [])
 
+    if not points and not lines and not polylines:
+        raise ValueError("geometry contains no features to export")
+
     workdir = tempfile.mkdtemp()
     path = os.path.join(workdir, "export.gpkg")
 
@@ -63,11 +67,11 @@ def generate_geopackage_b64(geometry: dict, feature_library: dict, options: dict
     if lines:
         gdf = gpd.GeoDataFrame(
             {
-                "codigo": [l["codigo"] for l in lines],
-                "capa": [_capa(feature_library, l["codigo"]) for l in lines],
+                "codigo": [line["codigo"] for line in lines],
+                "capa": [_capa(feature_library, line["codigo"]) for line in lines],
             },
             geometry=[
-                LineString([(v[0], v[1], v[2]) for v in l["vertices"]]) for l in lines
+                LineString([(v[0], v[1], v[2]) for v in line["vertices"]]) for line in lines
             ],
             crs=None,
         )
