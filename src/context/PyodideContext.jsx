@@ -9,6 +9,8 @@ export function PyodideProvider({ children }) {
   const [isRunning, setIsRunning] = useState(false)
   const pyRef = useRef(null)
   const initPromiseRef = useRef(null)
+  const pkgPromisesRef = useRef({})
+  const [loadedPkgs, setLoadedPkgs] = useState({})
 
   useEffect(() => {
     // Evita doble inicialización (React StrictMode ejecuta useEffect dos veces en dev)
@@ -61,8 +63,35 @@ export function PyodideProvider({ children }) {
     }
   }, [])
 
+  // Carga perezosa y memoizada de paquetes Pyodide pesados (p.ej. geopandas).
+  // Se puede llamar en segundo plano durante el flujo para precalentar.
+  const ensurePackages = useCallback(async (names) => {
+    await initPromiseRef.current
+    const py = pyRef.current
+    if (!py) return
+    const key = [...names].sort().join(',')
+    if (!pkgPromisesRef.current[key]) {
+      pkgPromisesRef.current[key] = py
+        .loadPackage(names)
+        .then(() => setLoadedPkgs((m) => ({ ...m, [key]: true })))
+        .catch((err) => {
+          // Permite reintentar en el próximo llamado.
+          delete pkgPromisesRef.current[key]
+          throw err
+        })
+    }
+    return pkgPromisesRef.current[key]
+  }, [])
+
+  const isPackagesReady = useCallback(
+    (names) => loadedPkgs[[...names].sort().join(',')] === true,
+    [loadedPkgs]
+  )
+
   return (
-    <PyodideContext.Provider value={{ isLoading, isRunning, runPython }}>
+    <PyodideContext.Provider
+      value={{ isLoading, isRunning, runPython, ensurePackages, isPackagesReady }}
+    >
       {children}
     </PyodideContext.Provider>
   )
