@@ -1,21 +1,29 @@
 import { useState } from 'react'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
 import { useApp } from '../../context/AppContext'
+import { usePyodide } from '../../context/PyodideContext'
 
 // Formatos disponibles en el desplegable (DXF queda por defecto).
 const FORMAT_OPTIONS = [
   { value: 'dxf', label: 'DXF' },
   { value: 'geojson', label: 'GeoJSON' },
   { value: 'shapefile', label: 'Shapefile (ZIP)' },
+  { value: 'geopackage', label: 'GeoPackage (.gpkg)' },
 ]
 
 export default function ExportPanel() {
   const { exportGeometry, isRunning } = usePythonBridge()
   const { state } = useApp()
+  const { isPackagesReady } = usePyodide()
   const [format, setFormat] = useState('dxf')
   const [includeLabels, setIncludeLabels] = useState(true)
 
   const isViewer = state.appMode === 'viewer'
+
+  // GeoPackage necesita geopandas+fiona; mientras se precargan, se deshabilita
+  // el botón y se muestra "Preparando…".
+  const geopkgPending =
+    format === 'geopackage' && !isPackagesReady(['geopandas', 'fiona'])
 
   const isCodeVisible = (codigo) =>
     state.featureLibrary[codigo]?.visible !== false
@@ -101,9 +109,11 @@ export default function ExportPanel() {
     FORMAT_OPTIONS.find((o) => o.value === format)?.label ?? 'DXF'
   const label = isRunning
     ? `Generando ${formatLabel}…`
-    : isViewer
-      ? 'Exportar selección'
-      : `Exportar ${formatLabel}`
+    : geopkgPending
+      ? 'Preparando GeoPackage…'
+      : isViewer
+        ? 'Exportar selección'
+        : `Exportar ${formatLabel}`
 
   return (
     <section className="flex flex-col gap-2 mt-auto">
@@ -140,7 +150,7 @@ export default function ExportPanel() {
       </label>
       <button
         onClick={handleExport}
-        disabled={isRunning || !hasGeometry}
+        disabled={isRunning || !hasGeometry || geopkgPending}
         className="w-full py-2 px-3 rounded bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
       >
         {label}

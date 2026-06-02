@@ -10,6 +10,7 @@ import IdleDropZone from './components/IdleDropZone/IdleDropZone'
 import StageStepper from './components/StageStepper/StageStepper'
 import ResumeSessionModal from './components/ResumeSessionModal/ResumeSessionModal'
 import { useSessionRehydration } from './hooks/useSessionRehydration'
+import { useGeopackagePreload } from './hooks/useGeopackagePreload'
 import { loadSession, clearSession } from './utils/sessionStorage'
 
 function MainArea() {
@@ -56,6 +57,7 @@ export default function App() {
 
   // Regenera la geometría si la sesión restaurada estaba en 'ready'/'viewer'.
   const isRehydrating = useSessionRehydration()
+  useGeopackagePreload()
 
   function handleContinue() {
     dispatch({ type: 'RESTORE_SESSION', payload: pendingSession })

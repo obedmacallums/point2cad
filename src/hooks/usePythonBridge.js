@@ -8,6 +8,7 @@ import geometryBuilderCode from '../../python/geometry_builder.py?raw'
 import dxfGeneratorCode from '../../python/dxf_generator.py?raw'
 import geojsonGeneratorCode from '../../python/geojson_generator.py?raw'
 import shapefileGeneratorCode from '../../python/shapefile_generator.py?raw'
+import geopackageGeneratorCode from '../../python/geopackage_generator.py?raw'
 
 // Configuración de cada formato de exportación: el código Python del generador,
 // la función a invocar, la extensión de salida, el MIME y si la salida es binaria
@@ -34,10 +35,18 @@ const EXPORT_FORMATS = {
     mimeType: 'application/zip',
     binary: true,
   },
+  geopackage: {
+    generatorCode: geopackageGeneratorCode,
+    call: 'generate_geopackage_b64(geometry, feature_lib, options)',
+    extension: '.gpkg',
+    mimeType: 'application/geopackage+sqlite3',
+    binary: true,
+    requiresPackages: ['geopandas', 'fiona'],
+  },
 }
 
 export function usePythonBridge() {
-  const { isLoading, isRunning, runPython } = usePyodide()
+  const { isLoading, isRunning, runPython, ensurePackages } = usePyodide()
   const { dispatch } = useApp()
 
   const detectCodes = useCallback(
@@ -131,6 +140,10 @@ print(_json.dumps({"type": "geometry", "data": geometry}))
       const fmt = EXPORT_FORMATS[format] ?? EXPORT_FORMATS.dxf
       const outName = (fileName ?? 'output.csv').replace(/\.csv$/i, fmt.extension)
 
+      if (fmt.requiresPackages) {
+        await ensurePackages(fmt.requiresPackages)
+      }
+
       const code = `
 import json as _json
 
@@ -161,7 +174,7 @@ print(_json.dumps({"type": "export_ready", "data": {"content": content, "filenam
         } catch {}
       }
     },
-    [runPython]
+    [runPython, ensurePackages]
   )
 
   return { detectCodes, processCSV, exportGeometry, isLoading, isRunning }
