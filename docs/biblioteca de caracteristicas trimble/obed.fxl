@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--This file represents feature definitions-->
+<FeatureCodingDefinitions xmlns="http://trimble.com/schema/fxl" Author="" CreationDate="2026-06-03T11:45:24" DateModified="2026-06-03T11:45:24" Description="" SchemaVersion="9" NumericCodes="false" MaxFeatureNameLength="40" MaxAttributeNameLength="20" MaxGroupNameLength="20" MaxCodeLength="20" MaxItemsPerGroup="9" MaxCategoryNameLength="20">
+  <FeatureDefinitions>
+    <PointFeatureDefinition Code="arb" Name="arb" Category="Miscellaneous" Layer="0"/>
+    <LineFeatureDefinition Code="borde" Name="borde" Category="Miscellaneous" LineStyleName="Solid" FieldLineStyle="Solid" Color="FF000000" Layer="0"/>
+    <PolygonFeatureDefinition Code="area" Name="area" Category="Miscellaneous" BorderLineStyleName="Solid" FieldBorderLineStyle="Solid" BorderColor="FF000000" Layer=""/>
+  </FeatureDefinitions>
+  <ControlCodeDefinitions>
+    <ControlCodeDefinition Code="inicio" Description="Iniciar secuencia de unión" Type="Start"/>
+    <ControlCodeDefinition Code="fin" Description="Finalizar secuencia de unión" Type="End"/>
+    <ControlCodeDefinition Code="cerrar" Description="Unir al primero (mismo código)" Type="Close"/>
+  </ControlCodeDefinitions>
+</FeatureCodingDefinitions>

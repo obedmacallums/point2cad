@@ -14,6 +14,8 @@ const PERSISTED_FIELDS = [
   'columnMapping',
   'codesSummary',
   'featureLibrary',
+  'controlCodes',
+  'controlOverrides',
   'fileName',
   'showLineVertices',
 ]

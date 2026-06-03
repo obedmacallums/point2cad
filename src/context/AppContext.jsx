@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import {
   autoDetectMapping,
+  assignColors,
   parseCSVPreview,
   DEFAULT_PARSE_OPTIONS,
   REQUIRED_FIELDS,
@@ -11,6 +12,19 @@ const AppContext = createContext(null)
 
 const emptyMapping = () =>
   Object.fromEntries(REQUIRED_FIELDS.map((f) => [f, null]))
+
+// Construye la featureLibrary preservando el color/capa de los códigos ya
+// presentes (no se pisan las ediciones del usuario al re-detectar tras un
+// override de control code) y asignando color por defecto a los nuevos.
+const buildFeatureLibrary = (codesSummary, existing = {}) => {
+  const defaults = assignColors(codesSummary)
+  const lib = {}
+  for (const { codigo } of codesSummary) {
+    lib[codigo] = existing[codigo] ?? defaults[codigo]
+  }
+  return lib
+}
+
 
 const initialState = {
   appMode: 'idle', // 'idle' | 'preview' | 'detecting' | 'codes_ready' | 'processing' | 'ready' | 'viewer'
@@ -30,6 +44,12 @@ const initialState = {
 
   // { CODIGO: { color, capa } } — colores asignados en JS al recibir codesSummary
   featureLibrary: {},
+
+  // Control codes detectados (modelo para la UI): [{token, role, source, ratio, count}]
+  controlCodes: [],
+  // token → rol SOLO para los control codes reasignados manualmente por el
+  // usuario (override). Los no editados conservan su rol/fuente detectados.
+  controlOverrides: {},
 
   points: [],
   lines: [],
@@ -59,6 +79,8 @@ function reducer(state, action) {
         columnMapping: autoDetectMapping(headers),
         codesSummary: [],
         featureLibrary: {},
+        controlCodes: [],
+        controlOverrides: {},
         points: [],
         lines: [],
         polylines: [],
@@ -82,6 +104,8 @@ function reducer(state, action) {
           columnMapping: autoDetectMapping(headers),
           codesSummary: [],
           featureLibrary: {},
+          controlCodes: [],
+          controlOverrides: {},
           points: [],
           lines: [],
           polylines: [],
@@ -104,6 +128,8 @@ function reducer(state, action) {
         // señal de que hay que volver a detectar/procesar al avanzar.
         codesSummary: [],
         featureLibrary: {},
+        controlCodes: [],
+        controlOverrides: {},
         points: [],
         lines: [],
         polylines: [],
@@ -112,13 +138,29 @@ function reducer(state, action) {
     case 'SET_DETECTING':
       return { ...state, appMode: 'detecting', error: null }
 
-    case 'SET_CODES_DETECTED':
+    case 'SET_CODES_DETECTED': {
+      const { codesSummary, controlCodes = [] } = action.payload
       return {
         ...state,
         appMode: 'codes_ready',
-        codesSummary: action.payload.codesSummary,
-        featureLibrary: action.payload.featureLibrary,
+        codesSummary,
+        // Preserva color/capa ya editados; asigna defaults a códigos nuevos.
+        featureLibrary: buildFeatureLibrary(codesSummary, state.featureLibrary),
+        controlCodes,
+        // controlOverrides se preserva: solo el usuario lo modifica (no se
+        // re-siembra con la detección, para no marcar como "manual" lo que no
+        // tocó). Las invalidaciones de mapeo/parseo sí lo limpian.
         error: null,
+      }
+    }
+
+    case 'SET_CONTROL_ROLE':
+      return {
+        ...state,
+        controlOverrides: {
+          ...state.controlOverrides,
+          [action.payload.token]: action.payload.role,
+        },
       }
 
     case 'UPDATE_FEATURE':
@@ -209,6 +251,8 @@ function reducer(state, action) {
         columnMapping: saved.columnMapping ?? emptyMapping(),
         codesSummary: saved.codesSummary ?? [],
         featureLibrary: saved.featureLibrary ?? {},
+        controlCodes: saved.controlCodes ?? [],
+        controlOverrides: saved.controlOverrides ?? {},
         fileName: saved.fileName ?? null,
         showLineVertices: saved.showLineVertices ?? false,
         // La geometría se regenera con useSessionRehydration.
@@ -247,6 +291,8 @@ export function AppProvider({ children }) {
     state.columnMapping,
     state.codesSummary,
     state.featureLibrary,
+    state.controlCodes,
+    state.controlOverrides,
     state.fileName,
     state.showLineVertices,
   ])

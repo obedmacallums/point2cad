@@ -1,9 +1,10 @@
 import { useCallback } from 'react'
 import { usePyodide } from '../context/PyodideContext'
 import { useApp } from '../context/AppContext'
-import { assignColors } from '../utils/csvLoader'
 
 import csvParserCode from '../../python/csv_parser.py?raw'
+import fieldCodesCode from '../../python/field_codes.py?raw'
+import shapesCode from '../../python/shapes.py?raw'
 import geometryBuilderCode from '../../python/geometry_builder.py?raw'
 import dxfGeneratorCode from '../../python/dxf_generator.py?raw'
 import geojsonGeneratorCode from '../../python/geojson_generator.py?raw'
@@ -50,18 +51,23 @@ export function usePythonBridge() {
   const { dispatch } = useApp()
 
   const detectCodes = useCallback(
-    async (csvText) => {
-      dispatch({ type: 'SET_DETECTING' })
+    async (csvText, controlOverrides = {}, { showDetecting = true } = {}) => {
+      // Al reasignar un control code re-detectamos sin volver a la etapa
+      // "detecting" (eso ocultaría la sección de revisión); refrescamos en sitio.
+      if (showDetecting) dispatch({ type: 'SET_DETECTING' })
 
       const code = `
 import json as _json
 
 ${csvParserCode}
+${fieldCodesCode}
 
 csv_text = _json.loads(${JSON.stringify(JSON.stringify(csvText))})
+overrides = _json.loads(${JSON.stringify(JSON.stringify(controlOverrides))})
 points_raw = parse_csv(csv_text)
-codes = detect_codes(points_raw)
-print(_json.dumps({"type": "codes", "data": codes}))
+codes = detect_codes(points_raw, overrides)
+control_codes = detect_control_codes(points_raw, overrides)
+print(_json.dumps({"type": "codes", "data": {"summary": codes, "controlCodes": control_codes}}))
 `
       const { stdout, stderr } = await runPython(code)
 
@@ -74,15 +80,17 @@ print(_json.dumps({"type": "codes", "data": codes}))
         try {
           const result = JSON.parse(line)
           if (result.type === 'codes') {
-            const codesSummary = result.data
-            const featureLibrary = assignColors(codesSummary)
+            const codesSummary = result.data.summary
+            const controlCodes = result.data.controlCodes
+            // El reducer construye/mergea la featureLibrary (preservando
+            // colores/capas ya editados) y siembra los roles de control.
             dispatch({
               type: 'SET_CODES_DETECTED',
-              payload: { codesSummary, featureLibrary },
+              payload: { codesSummary, controlCodes },
             })
             // Devolvemos el resultado para poder encadenar (p.ej. saltar
             // directo a "Procesar" desde el stepper).
-            return { codesSummary, featureLibrary }
+            return { codesSummary, controlCodes }
           }
         } catch {
           // línea no-JSON, ignorar
@@ -94,7 +102,7 @@ print(_json.dumps({"type": "codes", "data": codes}))
   )
 
   const processCSV = useCallback(
-    async (csvText, fileName, featureLibrary) => {
+    async (csvText, fileName, featureLibrary, controlOverrides = {}) => {
       dispatch({ type: 'SET_PROCESSING', payload: true })
 
       const code = `
@@ -102,13 +110,16 @@ import json as _json
 
 # Biblioteca de características definida por el usuario desde JS
 FEATURE_LIBRARY = _json.loads(${JSON.stringify(JSON.stringify(featureLibrary))})
+CONTROL_OVERRIDES = _json.loads(${JSON.stringify(JSON.stringify(controlOverrides))})
 
 ${csvParserCode}
+${fieldCodesCode}
+${shapesCode}
 ${geometryBuilderCode}
 
 csv_text = _json.loads(${JSON.stringify(JSON.stringify(csvText))})
 points_raw = parse_csv(csv_text)
-geometry = build_geometry(points_raw, FEATURE_LIBRARY)
+geometry = build_geometry(points_raw, FEATURE_LIBRARY, CONTROL_OVERRIDES)
 
 print(_json.dumps({"type": "geometry", "data": geometry}))
 `

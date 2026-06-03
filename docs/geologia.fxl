@@ -1,0 +1,188 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--This file represents feature coding definitions-->
+<FeatureCodingDefinitions CreationDate="2018-09-12T14:15:52.7960016-03:00" DateModified="2018-09-12T14:18:41.0951648-03:00" SchemaVersion="8" xmlns="http://trimble.com/schema/fxl">
+  <LineStyleDefinitions Version="2" xmlns="http://trimble.com/schema/linestyle">
+    <LineStyleDefinition Name="Solid" Description="Definition from Trimble Business Center">
+      <Units Reference="Ground" Length="Metric" />
+      <PatternType>Default</PatternType>
+      <Pattern TotalLength="10000.000000" EndLength="0.000000">
+        <Line Color="Empty" LineWeight="1">
+          <Location X="0.000000" Y="0.000000" />
+          <Location X="10000.000000" Y="0.000000" />
+        </Line>
+      </Pattern>
+    </LineStyleDefinition>
+  </LineStyleDefinitions>
+  <SymbolDefinitions Version="2" xmlns="http://trimble.com/schema/symbol">
+    <SymbolDefinition Name="Cross">
+      <Units Reference="Paper" Length="Metric" />
+      <Scale Size="Variable" Shape="Fixed" />
+      <Rotation Type="Allow" />
+      <Dimension First="Length" Second="Length" />
+      <Color Name="BlueViolet" Red="138" Green="43" Blue="226" />
+      <Component Number="1" Name="Cross">
+        <Line Color="BlueViolet" LineWeight="1">
+          <Location X="-2.000000" Y="-2.000000" />
+          <Location X="2.000000" Y="2.000000" />
+        </Line>
+        <Line Color="BlueViolet" LineWeight="1">
+          <Location X="-2.000000" Y="2.000000" />
+          <Location X="2.000000" Y="-2.000000" />
+        </Line>
+      </Component>
+      <Component Number="2" Name="" />
+    </SymbolDefinition>
+  </SymbolDefinitions>
+  <LabelStyles SchemaVersion="1" xmlns="http://trimble.com/schema/labelstyle">
+    <LineLabelStyles>
+      <LineLabelStyle Name="Standard" Description="Line Label Style" Gap="2.5" LineSpacing="1.5" Layer="0" TextStyle="Standard">
+        <LineLabels>
+          <LineLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/linelabel">
+            <Type>LineDistance</Type>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>1</Offset>
+            <Along>0.5</Along>
+          </LineLabel>
+          <LineLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/linelabel">
+            <Type>LineAzimuthBearing</Type>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>-1</Offset>
+            <Along>0.5</Along>
+          </LineLabel>
+          <LineLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/linelabel">
+            <Type>ArcDistance</Type>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>1</Offset>
+            <Along>0.5</Along>
+          </LineLabel>
+          <LineLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/linelabel">
+            <Type>ArcChordAzimuthBearing</Type>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>-1</Offset>
+            <Along>0.5</Along>
+          </LineLabel>
+          <LineLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/linelabel">
+            <Type>ArcRadius</Type>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>-2</Offset>
+            <Along>0.5</Along>
+          </LineLabel>
+        </LineLabels>
+      </LineLabelStyle>
+    </LineLabelStyles>
+    <PointLabelStyles>
+      <PointLabelStyle Name="Standard" Description="Point Label Style" LabelAttributeValuesOnly="false" LabelAttributesVertically="false" AlignToSegment="false" Rotation="0" Gap="2.5" LineSpacing="1.5" Layer="0" TextStyle="Standard">
+        <PointLabels>
+          <PointLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/pointlabel">
+            <Type>Name</Type>
+            <SymbolSize>0</SymbolSize>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>1</Offset>
+            <Position>Right</Position>
+          </PointLabel>
+          <PointLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/pointlabel">
+            <Type>Elevation</Type>
+            <SymbolSize>0</SymbolSize>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>0</Offset>
+            <Position>Right</Position>
+          </PointLabel>
+        </PointLabels>
+      </PointLabelStyle>
+    </PointLabelStyles>
+    <PolygonLabelStyles>
+      <PolygonLabelStyle Name="Standard" Description="Polygon Label Style" Rotation="0" Gap="2.5" LineSpacing="1.5" Layer="0" TextStyle="Standard">
+        <PolygonLabels>
+          <PolygonLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/polygonlabel">
+            <Type>Name</Type>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>0</Offset>
+            <Position>Center</Position>
+          </PolygonLabel>
+          <PolygonLabel xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://trimble.com/schema/polygonlabel">
+            <Type>Area</Type>
+            <Prefix />
+            <Units>ProjectSetting</Units>
+            <Precision>ProjectSetting</Precision>
+            <Angle>ProjectSetting</Angle>
+            <Offset>-1</Offset>
+            <Position>Center</Position>
+          </PolygonLabel>
+        </PolygonLabels>
+      </PolygonLabelStyle>
+    </PolygonLabelStyles>
+    <TextStyleDefinition xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Name="Standard" Description="Text Style" xmlns="http://tempuri.org/TextStyleDefinition.xsd">
+      <TypeFace>Courier New</TypeFace>
+      <Bold>false</Bold>
+      <AutoFlip>false</AutoFlip>
+      <WhiteOut>false</WhiteOut>
+      <Italic>false</Italic>
+      <Underline>false</Underline>
+      <Justification>CenterMiddle</Justification>
+      <Height>5</Height>
+      <WidthFactor>1</WidthFactor>
+      <ObliqueAngle>0</ObliqueAngle>
+      <Unit>Paper</Unit>
+    </TextStyleDefinition>
+  </LabelStyles>
+  <LayerDefinitions>
+    <LayerDefinition>
+      <Name>Lineas</Name>
+      <Color>FFFFFFFF</Color>
+      <LineStyleName>Solid</LineStyleName>
+      <LineWeight>0</LineWeight>
+      <ProtectLayer>false</ProtectLayer>
+      <LayerGroup>&lt;&lt;Ninguno&gt;&gt;</LayerGroup>
+    </LayerDefinition>
+    <LayerDefinition>
+      <Name>Points</Name>
+      <Color>FFFFFFFF</Color>
+      <LineStyleName>Solid</LineStyleName>
+      <LineWeight>0</LineWeight>
+      <ProtectLayer>true</ProtectLayer>
+      <LayerGroup>&lt;&lt;Ninguno&gt;&gt;</LayerGroup>
+    </LayerDefinition>
+    <LayerDefinition>
+      <Name>0</Name>
+      <Color>FFFFFFFF</Color>
+      <LineStyleName>Solid</LineStyleName>
+      <LineWeight>0</LineWeight>
+      <ProtectLayer>true</ProtectLayer>
+      <LayerGroup>&lt;&lt;Ninguno&gt;&gt;</LayerGroup>
+    </LayerDefinition>
+  </LayerDefinitions>
+  <FeatureDefinitions>
+    <LineFeatureDefinition Code="LINEA" Name="Linea" Category="Lineas" IncludeInSurface="true" Color="FE000000" Layer="Lineas" FieldLineStyle="Solid" LineStyleName="Solid" LineStyleScale="1" LineLabelStyle="" PointLabelStyle="" PointLayer="0">
+      <Attributes>
+        <StringAttribute Name="Tipo de falla" EntryMethod="Optional" MaximumLength="50" />
+        <StringAttribute Name="Manteo" EntryMethod="Optional" MaximumLength="50" />
+        <StringAttribute Name="Espesor" EntryMethod="Optional" MaximumLength="50" />
+        <StringAttribute Name="Rugosidad" EntryMethod="Optional" MaximumLength="50" />
+      </Attributes>
+    </LineFeatureDefinition>
+  </FeatureDefinitions>
+</FeatureCodingDefinitions>
