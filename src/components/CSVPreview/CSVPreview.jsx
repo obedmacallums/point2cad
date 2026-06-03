@@ -267,20 +267,21 @@ export default function CSVPreview() {
       state.rawCSVRows,
       state.columnMapping
     )
-    await processCSV(canonicalCSV, state.fileName, state.featureLibrary, state.controlRoles)
+    await processCSV(canonicalCSV, state.fileName, state.featureLibrary, state.controlOverrides)
   }
 
-  // El usuario reasigna el rol de un control code: actualiza el override y
-  // re-detecta (en sitio) para refrescar la columna "Tipo" de los códigos.
+  // El usuario reasigna el rol de un control code: registra SOLO ese override
+  // (los demás conservan su detección por léxico/geometría) y re-detecta en
+  // sitio para refrescar la columna "Tipo" de los códigos.
   async function handleControlRole(token, role) {
-    const newRoles = { ...state.controlRoles, [token]: role }
+    const newOverrides = { ...state.controlOverrides, [token]: role }
     dispatch({ type: 'SET_CONTROL_ROLE', payload: { token, role } })
     const canonicalCSV = buildCanonicalCSV(
       state.csvHeaders,
       state.rawCSVRows,
       state.columnMapping
     )
-    await detectCodes(canonicalCSV, newRoles, { showDetecting: false })
+    await detectCodes(canonicalCSV, newOverrides, { showDetecting: false })
   }
 
   // Botón principal según el estado actual
@@ -585,7 +586,7 @@ export default function CSVPreview() {
 
           <div className="flex flex-col gap-1">
             {state.controlCodes.map((cc) => {
-              const role = state.controlRoles[cc.token] ?? cc.role
+              const role = state.controlOverrides[cc.token] ?? cc.role
               const source = SOURCE_LABEL[cc.source] ?? SOURCE_LABEL.geometry
               return (
                 <div

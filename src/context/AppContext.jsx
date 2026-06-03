@@ -25,10 +25,6 @@ const buildFeatureLibrary = (codesSummary, existing = {}) => {
   return lib
 }
 
-// token → rol efectivo a partir del modelo de control codes detectado (cuyo rol
-// ya refleja los overrides aplicados en Python).
-const seedControlRoles = (controlCodes = []) =>
-  Object.fromEntries(controlCodes.map((c) => [c.token, c.role]))
 
 const initialState = {
   appMode: 'idle', // 'idle' | 'preview' | 'detecting' | 'codes_ready' | 'processing' | 'ready' | 'viewer'
@@ -51,8 +47,9 @@ const initialState = {
 
   // Control codes detectados (modelo para la UI): [{token, role, source, ratio, count}]
   controlCodes: [],
-  // token → rol efectivo (detectado por defecto, editable por el usuario)
-  controlRoles: {},
+  // token → rol SOLO para los control codes reasignados manualmente por el
+  // usuario (override). Los no editados conservan su rol/fuente detectados.
+  controlOverrides: {},
 
   points: [],
   lines: [],
@@ -83,7 +80,7 @@ function reducer(state, action) {
         codesSummary: [],
         featureLibrary: {},
         controlCodes: [],
-        controlRoles: {},
+        controlOverrides: {},
         points: [],
         lines: [],
         polylines: [],
@@ -108,7 +105,7 @@ function reducer(state, action) {
           codesSummary: [],
           featureLibrary: {},
           controlCodes: [],
-          controlRoles: {},
+          controlOverrides: {},
           points: [],
           lines: [],
           polylines: [],
@@ -132,7 +129,7 @@ function reducer(state, action) {
         codesSummary: [],
         featureLibrary: {},
         controlCodes: [],
-        controlRoles: {},
+        controlOverrides: {},
         points: [],
         lines: [],
         polylines: [],
@@ -150,7 +147,9 @@ function reducer(state, action) {
         // Preserva color/capa ya editados; asigna defaults a códigos nuevos.
         featureLibrary: buildFeatureLibrary(codesSummary, state.featureLibrary),
         controlCodes,
-        controlRoles: seedControlRoles(controlCodes),
+        // controlOverrides se preserva: solo el usuario lo modifica (no se
+        // re-siembra con la detección, para no marcar como "manual" lo que no
+        // tocó). Las invalidaciones de mapeo/parseo sí lo limpian.
         error: null,
       }
     }
@@ -158,8 +157,8 @@ function reducer(state, action) {
     case 'SET_CONTROL_ROLE':
       return {
         ...state,
-        controlRoles: {
-          ...state.controlRoles,
+        controlOverrides: {
+          ...state.controlOverrides,
           [action.payload.token]: action.payload.role,
         },
       }
@@ -253,7 +252,7 @@ function reducer(state, action) {
         codesSummary: saved.codesSummary ?? [],
         featureLibrary: saved.featureLibrary ?? {},
         controlCodes: saved.controlCodes ?? [],
-        controlRoles: saved.controlRoles ?? {},
+        controlOverrides: saved.controlOverrides ?? {},
         fileName: saved.fileName ?? null,
         showLineVertices: saved.showLineVertices ?? false,
         // La geometría se regenera con useSessionRehydration.
@@ -293,7 +292,7 @@ export function AppProvider({ children }) {
     state.codesSummary,
     state.featureLibrary,
     state.controlCodes,
-    state.controlRoles,
+    state.controlOverrides,
     state.fileName,
     state.showLineVertices,
   ])

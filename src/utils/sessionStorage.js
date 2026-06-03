@@ -15,7 +15,7 @@ const PERSISTED_FIELDS = [
   'codesSummary',
   'featureLibrary',
   'controlCodes',
-  'controlRoles',
+  'controlOverrides',
   'fileName',
   'showLineVertices',
 ]
