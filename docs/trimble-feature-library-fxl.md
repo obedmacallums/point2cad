@@ -350,8 +350,43 @@ FENCE01   FENCE02   FENCE03
 │  Process Feature Codes      │     → genera linework, símbolos
 │        ↓                    │       y rellena atributos
 │   Export a CAD/GIS          │  4. Exportar (DWG/DXF, Shapefile,
-└─────────────────────────────┘     GeoPackage, etc.)
+└─────────────────────────────┘     GeoPackage, CSV, etc.)
 ```
+
+### 7.1 El código en los datos exportados
+
+La biblioteca de características (definida en TBC o en Trimble Access) **viaja
+con cada punto medido**: al asignar un código en campo, ese código queda
+**almacenado en el punto** dentro del levantamiento.
+
+Por eso, cuando exportas los puntos a un formato tabular —por ejemplo un
+**CSV**— aparece un **campo `Code`** (código) cuyo valor es **exactamente el
+código de la biblioteca** que definiste. Es el nexo entre la biblioteca y los
+datos:
+
+```
+Punto,Norte,Este,Cota,Codigo
+101,5234.120,8120.045,512.30,SEÑAL
+102,5235.880,8121.770,512.10,ARBOL
+103,5237.450,8123.010,511.95,BORD
+104,5239.000,8124.660,511.80,BORD FIN
+```
+
+- El campo `Codigo`/`Code` contiene el **código de feature** de la biblioteca
+  (`SEÑAL`, `ARBOL`, `BORD`…) y, si se usaron, los **control codes** anexados
+  separados por espacio (`BORD FIN` = bordillo + fin de secuencia).
+- **El CSV exporta el código, no la definición**: no incluye el símbolo, el
+  estilo de línea ni los tipos de atributo; solo el texto del código (y, según
+  el exportador, los valores de los atributos como columnas adicionales). Para
+  reconstruir simbología y linework hace falta volver a aplicar el **mismo
+  `.fxl`** en el software que lo interprete.
+- En cambio, exportadores con esquema (DWG/DXF, Shapefile, **GeoPackage**) sí
+  pueden trasladar capas, geometría y atributos, porque el `.fxl` se usó al
+  procesar los códigos en oficina.
+
+> En resumen: **defines la biblioteca → mides asignando códigos → al exportar, el
+> campo `Code` de cada punto "representa" esa biblioteca.** El código es el
+> identificador que enlaza el dato de campo con la definición del `.fxl`.
 
 ---
 
