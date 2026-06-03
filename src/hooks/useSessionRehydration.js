@@ -32,7 +32,12 @@ export function useSessionRehydration() {
       state.columnMapping,
     )
 
-    processCSV(canonicalCSV, state.fileName, state.featureLibrary).then((geo) => {
+    processCSV(
+      canonicalCSV,
+      state.fileName,
+      state.featureLibrary,
+      state.controlRoles,
+    ).then((geo) => {
       // processCSV deja appMode en 'ready'; si veníamos del viewer, regresamos.
       if (geo && targetMode === 'viewer') {
         dispatch({ type: 'SET_MODE', payload: 'viewer' })
@@ -48,6 +53,7 @@ export function useSessionRehydration() {
     state.columnMapping,
     state.fileName,
     state.featureLibrary,
+    state.controlRoles,
     processCSV,
     dispatch,
   ])

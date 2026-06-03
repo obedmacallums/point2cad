@@ -14,6 +14,25 @@ const TIPO_COLOR = {
   'Polilínea cerrada':  'text-purple-400',
 }
 
+// Roles asignables a un control code (en español para la UI).
+const CONTROL_ROLE_OPTIONS = [
+  { value: 'start',  label: 'Inicio' },
+  { value: 'end',    label: 'Fin (línea)' },
+  { value: 'close',  label: 'Cerrar (polígono)' },
+  { value: 'join',   label: 'Unir' },
+  { value: 'circle', label: 'Círculo' },
+  { value: 'arc',    label: 'Arco' },
+  { value: 'rect',   label: 'Rectángulo' },
+  { value: 'smooth', label: 'Curva suave' },
+]
+
+// De dónde salió la asignación por defecto de cada control code.
+const SOURCE_LABEL = {
+  lexicon:  { text: 'léxico',    cls: 'text-blue-300' },
+  geometry: { text: 'geometría', cls: 'text-amber-300' },
+  override: { text: 'manual',    cls: 'text-emerald-300' },
+}
+
 const ROW_COUNT_OPTIONS = [
   { value: 5, label: '5' },
   { value: 10, label: '10' },
@@ -248,7 +267,20 @@ export default function CSVPreview() {
       state.rawCSVRows,
       state.columnMapping
     )
-    await processCSV(canonicalCSV, state.fileName, state.featureLibrary)
+    await processCSV(canonicalCSV, state.fileName, state.featureLibrary, state.controlRoles)
+  }
+
+  // El usuario reasigna el rol de un control code: actualiza el override y
+  // re-detecta (en sitio) para refrescar la columna "Tipo" de los códigos.
+  async function handleControlRole(token, role) {
+    const newRoles = { ...state.controlRoles, [token]: role }
+    dispatch({ type: 'SET_CONTROL_ROLE', payload: { token, role } })
+    const canonicalCSV = buildCanonicalCSV(
+      state.csvHeaders,
+      state.rawCSVRows,
+      state.columnMapping
+    )
+    await detectCodes(canonicalCSV, newRoles, { showDetecting: false })
   }
 
   // Botón principal según el estado actual
@@ -524,6 +556,71 @@ export default function CSVPreview() {
               … y {invalidCount - 10} fila{invalidCount - 10 === 1 ? '' : 's'} más con problemas.
             </p>
           )}
+        </section>
+      )}
+
+      {/* Códigos de control — detección por defecto (léxico/geometría) con
+          opción de reasignar el rol de cada token. Solo en Detectar/Procesar. */}
+      {(state.appMode === 'codes_ready' || state.appMode === 'processing') &&
+        state.controlCodes.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Códigos de control
+              <span className="ml-2 bg-gray-800 text-gray-300 text-[10px] px-1.5 py-0.5 rounded-full font-normal">
+                {state.controlCodes.length}
+              </span>
+            </h3>
+            <p className="text-[11px] text-gray-500">
+              Detectados automáticamente; ajusta el rol si alguno no es correcto
+            </p>
+          </div>
+
+          <div className="grid grid-cols-[1fr_180px_120px_90px] gap-3 text-[11px] font-semibold text-gray-500 uppercase px-2">
+            <span>Código</span>
+            <span>Rol</span>
+            <span>Detección</span>
+            <span className="text-right">Usos</span>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            {state.controlCodes.map((cc) => {
+              const role = state.controlRoles[cc.token] ?? cc.role
+              const source = SOURCE_LABEL[cc.source] ?? SOURCE_LABEL.geometry
+              return (
+                <div
+                  key={cc.token}
+                  className="grid grid-cols-[1fr_180px_120px_90px] items-center gap-3 bg-gray-800/60 hover:bg-gray-800 rounded-lg px-2 py-2 transition-colors"
+                >
+                  <span className="font-mono text-xs font-semibold text-cyan-300 truncate uppercase">
+                    {cc.token}
+                  </span>
+
+                  <select
+                    value={role}
+                    onChange={(e) => handleControlRole(cc.token, e.target.value)}
+                    disabled={busy}
+                    className="bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                  >
+                    {CONTROL_ROLE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+
+                  <span className={`text-[11px] ${source.cls}`}>
+                    {source.text}
+                    {cc.source === 'geometry' && cc.ratio != null && (
+                      <span className="text-gray-500"> ({cc.ratio.toFixed(2)})</span>
+                    )}
+                  </span>
+
+                  <span className="text-[11px] text-gray-400 text-right font-mono">
+                    {cc.count}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
         </section>
       )}
 
