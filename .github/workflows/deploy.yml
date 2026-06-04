@@ -34,6 +34,8 @@ jobs:
           # Vite usa este valor como `base` para que los assets carguen
           # correctamente en la URL https://<user>.github.io/<repo>/
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - uses: actions/configure-pages@v5
 

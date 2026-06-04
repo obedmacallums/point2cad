@@ -11,4 +11,9 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.js',
+  },
 })
