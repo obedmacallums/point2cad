@@ -8,3 +8,6 @@ __pycache__/
 
 # Zips de referencia (la carpeta descomprimida ya está versionada)
 docs/**/*.zip
+
+# Variables de entorno locales
+.env
