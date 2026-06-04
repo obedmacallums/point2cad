@@ -9,6 +9,7 @@ import ExportPanel from './components/ExportPanel/ExportPanel'
 import IdleDropZone from './components/IdleDropZone/IdleDropZone'
 import StageStepper from './components/StageStepper/StageStepper'
 import ResumeSessionModal from './components/ResumeSessionModal/ResumeSessionModal'
+import UserMenu from './components/UserMenu/UserMenu'
 import { useSessionRehydration } from './hooks/useSessionRehydration'
 import { useGeopackagePreload } from './hooks/useGeopackagePreload'
 import { loadSession, clearSession } from './utils/sessionStorage'
@@ -86,6 +87,7 @@ export default function App() {
             <ExportPanel />
           </>
         )}
+        <UserMenu />
       </aside>
 
       <main className="flex-1 min-w-0 flex flex-col bg-gray-950">
