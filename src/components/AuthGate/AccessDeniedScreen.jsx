@@ -1,9 +1,10 @@
 import { useAuth } from '../../context/AuthContext'
+import FullScreen from './FullScreen'
 
 export default function AccessDeniedScreen() {
   const { signOut } = useAuth()
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-gray-950 text-gray-100">
+    <FullScreen>
       <h1 className="text-xl font-semibold">Acceso desactivado</h1>
       <p className="max-w-sm text-center text-gray-400">
         Tu cuenta no está activa. Contacta al administrador para que habilite tu acceso.
@@ -14,6 +15,6 @@ export default function AccessDeniedScreen() {
       >
         Cerrar sesión
       </button>
-    </div>
+    </FullScreen>
   )
 }

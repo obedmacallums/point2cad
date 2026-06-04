@@ -1,9 +1,10 @@
 import { useAuth } from '../../context/AuthContext'
+import FullScreen from './FullScreen'
 
 export default function LoginScreen() {
   const { signInWithGoogle } = useAuth()
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-gray-950 text-gray-100">
+    <FullScreen>
       <h1 className="text-2xl font-semibold">Point2CAD</h1>
       <p className="text-gray-400">Inicia sesión para continuar</p>
       <button
@@ -12,6 +13,6 @@ export default function LoginScreen() {
       >
         Entrar con Google
       </button>
-    </div>
+    </FullScreen>
   )
 }

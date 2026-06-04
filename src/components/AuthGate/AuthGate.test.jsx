@@ -40,4 +40,10 @@ describe('AuthGate', () => {
     setup({ status: 'error', retry: vi.fn() })
     expect(screen.getByRole('button', { name: /reintentar/i })).toBeInTheDocument()
   })
+
+  it('muestra el spinner mientras verifica el acceso', () => {
+    setup({ status: 'loading' })
+    expect(screen.getByText(/verificando acceso/i)).toBeInTheDocument()
+    expect(screen.queryByText('APP CONTENT')).not.toBeInTheDocument()
+  })
 })

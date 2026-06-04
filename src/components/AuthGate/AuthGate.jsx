@@ -1,14 +1,7 @@
 import { useAuth } from '../../context/AuthContext'
 import LoginScreen from './LoginScreen'
 import AccessDeniedScreen from './AccessDeniedScreen'
-
-function FullScreen({ children }) {
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-gray-950 text-gray-100">
-      {children}
-    </div>
-  )
-}
+import FullScreen from './FullScreen'
 
 export default function AuthGate({ children }) {
   const { status, retry } = useAuth()
