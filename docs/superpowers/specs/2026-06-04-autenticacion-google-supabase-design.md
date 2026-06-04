@@ -32,7 +32,7 @@ respaldado por una base de datos en Supabase. Requisitos:
 
 ## Arquitectura y flujo
 
-```
+```text
 1. Sin sesión → AuthGate muestra "Entrar con Google".
 2. signInWithOAuth({ provider: 'google' })  [flujo por REDIRECCIÓN, no popup]
 3. Vuelve con sesión → AuthGate lee el perfil propio del usuario.
