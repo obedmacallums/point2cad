@@ -26,7 +26,10 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm ci
+      # Usamos `npm install` (no `npm ci`) porque el lockfile generado por la
+      # toolchain local más nueva omite algunas opcionales de plataforma de
+      # esbuild que `npm ci` exige; `npm install` resuelve por plataforma en CI.
+      - run: npm install --no-audit --no-fund
 
       - name: Build
         run: npm run build
