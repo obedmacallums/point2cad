@@ -8,7 +8,7 @@ import {
   GizmoHelper,
   GizmoViewport,
 } from '@react-three/drei'
-import { CanvasTexture } from 'three'
+import { CanvasTexture, Vector3 } from 'three'
 import { useApp } from '../../context/AppContext'
 import ViewerToolbar from './ViewerToolbar'
 import MeasurementOverlay from './MeasurementOverlay'
@@ -47,7 +47,8 @@ const CIRCLE_TEXTURE = (() => {
 // El threshold del raycaster para <points> está en unidades de mundo, pero
 // nuestros puntos son constantes en pantalla → recalculamos cada frame el
 // equivalente en mundo del radio visible usando la distancia cámara→target.
-// Sin esto el click area no coincide con lo que el usuario ve.
+// Esto SOLO afecta al cursor de hover (onPointerOver); la selección real se
+// hace en espacio de pantalla con PointPicker, que es independiente de la vista.
 function PointsRaycasterTuner({ hitPixelSize }) {
   const { camera, raycaster, size, controls } = useThree()
   useFrame(() => {
@@ -58,6 +59,69 @@ function PointsRaycasterTuner({ hitPixelSize }) {
     const worldPerPixel = (2 * distance * Math.tan(fov / 2)) / size.height
     raycaster.params.Points.threshold = (hitPixelSize / 2) * worldPerPixel
   })
+  return null
+}
+
+// Selección de puntos en espacio de pantalla. En lugar de depender del umbral en
+// unidades de mundo del raycaster (que en perspectiva da un área de toque distinta
+// según la profundidad de cada punto → puntos lejanos difíciles de acertar en
+// vistas inclinadas), proyectamos cada punto a píxeles y elegimos el más cercano
+// al puntero dentro de `hitRadius`. Así el área de toque es constante en píxeles
+// en cualquier vista o posición de cámara.
+//
+// `candidates`: [{ pt, lx, ly, lz }] con la posición local ya calculada.
+// Distingue tap de arrastre (rotar/pan) comparando el desplazamiento del puntero;
+// si se movió, no selecciona y deja actuar a OrbitControls.
+function PointPicker({ candidates, hitRadius, onPick, onMiss }) {
+  const { camera, gl } = useThree()
+  const downRef = useRef(null)
+  // Refs para leer siempre los callbacks más recientes sin re-suscribir los
+  // listeners cada vez que cambia el modo medición.
+  const onPickRef = useRef(onPick)
+  const onMissRef = useRef(onMiss)
+  onPickRef.current = onPick
+  onMissRef.current = onMiss
+
+  useEffect(() => {
+    const el = gl.domElement
+    const handleDown = (e) => {
+      downRef.current = e.isPrimary ? { x: e.clientX, y: e.clientY } : null
+    }
+    const handleUp = (e) => {
+      const start = downRef.current
+      downRef.current = null
+      if (!start || !e.isPrimary) return
+      // Si el puntero se movió, fue un arrastre (rotar/pan) → no seleccionar.
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8) return
+
+      const rect = el.getBoundingClientRect()
+      const px = e.clientX - rect.left
+      const py = e.clientY - rect.top
+      const v = new Vector3()
+      let best = null
+      let bestDist = hitRadius
+      for (const c of candidates) {
+        v.set(c.lx, c.ly, c.lz).project(camera)
+        if (v.z > 1) continue // detrás de la cámara / fuera del frustum
+        const sx = (v.x * 0.5 + 0.5) * rect.width
+        const sy = (-v.y * 0.5 + 0.5) * rect.height
+        const d = Math.hypot(sx - px, sy - py)
+        if (d <= bestDist) {
+          bestDist = d
+          best = c.pt
+        }
+      }
+      if (best) onPickRef.current(best)
+      else onMissRef.current()
+    }
+    el.addEventListener('pointerdown', handleDown)
+    el.addEventListener('pointerup', handleUp)
+    return () => {
+      el.removeEventListener('pointerdown', handleDown)
+      el.removeEventListener('pointerup', handleUp)
+    }
+  }, [gl, camera, candidates, hitRadius])
+
   return null
 }
 
@@ -225,6 +289,41 @@ export default function Viewer3D() {
     })
   }, [visiblePoints, syntheticVertices, lib, originX, originY]) // eslint-disable-line
 
+  // Candidatos para la selección en pantalla: cada punto con su posición local
+  // ya transformada (la misma que se usa al renderizar). PointPicker los proyecta
+  // a píxeles en cada tap.
+  const pickCandidates = useMemo(
+    () =>
+      [...visiblePoints, ...syntheticVertices].map((pt) => {
+        const [lx, ly, lz] = toLocal([pt.x, pt.y, pt.z])
+        return { pt, lx, ly, lz }
+      }),
+    [visiblePoints, syntheticVertices, originX, originY, originZ], // eslint-disable-line
+  )
+
+  // Selección de un punto (tap): en medición acumula el par; fuera de medición
+  // alterna el tooltip. Estable salvo cuando cambia measureMode.
+  const handlePointPick = useCallback(
+    (pt) => {
+      if (measureMode) {
+        setMeasurePoints((cur) => {
+          if (cur[0] === null) return [pt, null]
+          if (cur[1] === null) return [cur[0], pt]
+          return [pt, null]
+        })
+      } else {
+        setSelectedPoint((cur) => (cur === pt ? null : pt))
+      }
+    },
+    [measureMode],
+  )
+
+  // Tap en vacío: fuera de medición cierra el tooltip; en medición no borra nada
+  // (solo Esc o el botón × cierran la medición).
+  const handlePointMiss = useCallback(() => {
+    if (!measureMode) setSelectedPoint(null)
+  }, [measureMode])
+
   const setView = useCallback(
     (view) => {
       const cam = cameraRef.current
@@ -255,12 +354,6 @@ export default function Viewer3D() {
       <Canvas
         camera={{ position: [0, 100, 100], fov: 50, near: 0.1, far: spread * 20 }}
         className="bg-gray-950"
-        onPointerMissed={() => {
-          // En modo medición no se borra con clicks en el canvas (ni izq ni
-          // derecho) — solo Esc o el botón × del overlay cierran la medición.
-          // Para cambiar de punto: click sobre otro punto (auto-reinicia).
-          if (!measureMode) setSelectedPoint(null)
-        }}
       >
         <ambientLight intensity={0.8} />
         <directionalLight position={[1, 2, 1]} intensity={0.6} />
@@ -282,10 +375,18 @@ export default function Viewer3D() {
 
         <PointsRaycasterTuner hitPixelSize={HIT_PIXEL_SIZE} />
 
+        {/* Selección en espacio de pantalla (independiente de la vista). */}
+        <PointPicker
+          candidates={pickCandidates}
+          hitRadius={HIT_PIXEL_SIZE / 2}
+          onPick={handlePointPick}
+          onMiss={handlePointMiss}
+        />
+
         {/* Puntos: un <points> por color (1 draw call por grupo) con tamaño
-            constante en pantalla. El índice del punto clickeado viene en
-            e.index del evento de raycast, lo usamos para identificar pt. */}
-        {pointBuffers.map(({ color, pts, positions }) => (
+            constante en pantalla. onPointerOver/Out solo cambia el cursor en
+            escritorio; la selección la maneja PointPicker. */}
+        {pointBuffers.map(({ color, positions }) => (
           <points
             key={color}
             onPointerOver={(e) => {
@@ -294,20 +395,6 @@ export default function Viewer3D() {
             }}
             onPointerOut={() => {
               document.body.style.cursor = ''
-            }}
-            onClick={(e) => {
-              e.stopPropagation()
-              const pt = pts[e.index]
-              if (!pt) return
-              if (measureMode) {
-                setMeasurePoints((cur) => {
-                  if (cur[0] === null) return [pt, null]
-                  if (cur[1] === null) return [cur[0], pt]
-                  return [pt, null]
-                })
-              } else {
-                setSelectedPoint((cur) => (cur === pt ? null : pt))
-              }
             }}
           >
             <bufferGeometry>
