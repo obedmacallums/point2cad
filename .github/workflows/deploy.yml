@@ -34,9 +34,10 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Vite usa este valor como `base` para que los assets carguen
-          # correctamente en la URL https://<user>.github.io/<repo>/
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          # Con dominio personalizado el sitio se sirve desde la raíz `/`.
+          # (Si volvieras a la URL https://<user>.github.io/<repo>/ habría
+          # que usar /${{ github.event.repository.name }}/ aquí.)
+          VITE_BASE_PATH: /
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
