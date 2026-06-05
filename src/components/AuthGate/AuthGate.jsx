@@ -6,6 +6,13 @@ import FullScreen from './FullScreen'
 export default function AuthGate({ children }) {
   const { status, retry } = useAuth()
 
+  // Bypass solo para desarrollo: con VITE_DISABLE_AUTH=true se salta la
+  // autenticación. Doble seguridad: `import.meta.env.DEV` es false en los
+  // builds de producción, así que esto nunca puede desactivar la auth en Pages.
+  if (import.meta.env.DEV && import.meta.env.VITE_DISABLE_AUTH === 'true') {
+    return children
+  }
+
   if (status === 'loading') {
     return (
       <FullScreen>

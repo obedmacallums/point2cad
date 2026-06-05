@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import AuthGate from './AuthGate'
 import { useAuth } from '../../context/AuthContext'
@@ -7,6 +7,13 @@ vi.mock('../../context/AuthContext', () => ({ useAuth: vi.fn() }))
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Neutraliza el flag del .env local para que los tests de enrutado sean
+  // deterministas; el test de bypass lo activa explícitamente.
+  vi.stubEnv('VITE_DISABLE_AUTH', 'false')
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 function setup(authValue) {
@@ -45,5 +52,14 @@ describe('AuthGate', () => {
     setup({ status: 'loading' })
     expect(screen.getByText(/verificando acceso/i)).toBeInTheDocument()
     expect(screen.queryByText('APP CONTENT')).not.toBeInTheDocument()
+  })
+
+  it('salta la auth en dev con VITE_DISABLE_AUTH=true (aunque no haya sesión)', () => {
+    vi.stubEnv('VITE_DISABLE_AUTH', 'true')
+    setup({ status: 'signedOut', signInWithGoogle: vi.fn() })
+    expect(screen.getByText('APP CONTENT')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /entrar con google/i }),
+    ).not.toBeInTheDocument()
   })
 })
