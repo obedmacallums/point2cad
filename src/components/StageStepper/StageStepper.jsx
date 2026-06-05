@@ -11,7 +11,7 @@ export default function StageStepper() {
   const { stageStatus, goToStage, busy } = useStageNavigation()
 
   return (
-    <nav className="flex items-center gap-2 px-6 py-3 border-b border-gray-800 bg-gray-900 flex-shrink-0">
+    <nav className="flex items-center gap-2 px-3 sm:px-6 py-2 sm:py-3 border-b border-gray-800 bg-gray-900 flex-shrink-0 overflow-x-auto">
       {STAGES.map((stage, i) => {
         const status = stageStatus(stage.id)
         const clickable = status === 'completed' && !busy
@@ -35,7 +35,7 @@ export default function StageStepper() {
               >
                 {status === 'completed' ? '✓' : i + 1}
               </span>
-              {stage.label}
+              <span className="hidden sm:inline">{stage.label}</span>
             </button>
             {i < STAGES.length - 1 && (
               <span className="text-gray-700 select-none">→</span>

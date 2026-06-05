@@ -41,9 +41,9 @@ export default function ResultsPanel() {
   ]
 
   return (
-    <div className="flex flex-col gap-6 p-6 h-full bg-gray-950">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 h-full bg-gray-950">
       {/* Encabezado con acciones a la derecha (mismo patrón que CSVPreview) */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-base font-semibold text-white">{state.fileName}</h2>
           <p className="text-sm text-gray-400 mt-0.5">
@@ -79,7 +79,7 @@ export default function ResultsPanel() {
           </p>
         </div>
 
-        <div className="flex gap-6">
+        <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
           {stats.map(({ label, value, color, Icon }) => (
             <div key={label} className="flex flex-col items-center gap-2 bg-gray-800 rounded-xl px-6 py-4 min-w-[110px]">
               <Icon className={`w-6 h-6 ${color} opacity-80`} />

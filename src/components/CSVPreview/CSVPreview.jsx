@@ -315,9 +315,9 @@ export default function CSVPreview() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 h-full overflow-y-auto bg-gray-950">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 h-full overflow-y-auto bg-gray-950">
       {/* Encabezado */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-base font-semibold text-white">{state.fileName}</h2>
           <p className="text-sm text-gray-400 mt-0.5">
@@ -577,50 +577,54 @@ export default function CSVPreview() {
             </p>
           </div>
 
-          <div className="grid grid-cols-[1fr_180px_120px_90px] gap-3 text-[11px] font-semibold text-gray-500 uppercase px-2">
-            <span>Código</span>
-            <span>Rol</span>
-            <span>Detección</span>
-            <span className="text-right">Usos</span>
-          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[520px] flex flex-col gap-3">
+              <div className="grid grid-cols-[1fr_180px_120px_90px] gap-3 text-[11px] font-semibold text-gray-500 uppercase px-2">
+                <span>Código</span>
+                <span>Rol</span>
+                <span>Detección</span>
+                <span className="text-right">Usos</span>
+              </div>
 
-          <div className="flex flex-col gap-1">
-            {state.controlCodes.map((cc) => {
-              const role = state.controlOverrides[cc.token] ?? cc.role
-              const source = SOURCE_LABEL[cc.source] ?? SOURCE_LABEL.geometry
-              return (
-                <div
-                  key={cc.token}
-                  className="grid grid-cols-[1fr_180px_120px_90px] items-center gap-3 bg-gray-800/60 hover:bg-gray-800 rounded-lg px-2 py-2 transition-colors"
-                >
-                  <span className="font-mono text-xs font-semibold text-cyan-300 truncate uppercase">
-                    {cc.token}
-                  </span>
+              <div className="flex flex-col gap-1">
+                {state.controlCodes.map((cc) => {
+                  const role = state.controlOverrides[cc.token] ?? cc.role
+                  const source = SOURCE_LABEL[cc.source] ?? SOURCE_LABEL.geometry
+                  return (
+                    <div
+                      key={cc.token}
+                      className="grid grid-cols-[1fr_180px_120px_90px] items-center gap-3 bg-gray-800/60 hover:bg-gray-800 rounded-lg px-2 py-2 transition-colors"
+                    >
+                      <span className="font-mono text-xs font-semibold text-cyan-300 truncate uppercase">
+                        {cc.token}
+                      </span>
 
-                  <select
-                    value={role}
-                    onChange={(e) => handleControlRole(cc.token, e.target.value)}
-                    disabled={busy}
-                    className="bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
-                  >
-                    {CONTROL_ROLE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                      <select
+                        value={role}
+                        onChange={(e) => handleControlRole(cc.token, e.target.value)}
+                        disabled={busy}
+                        className="bg-gray-700 hover:bg-gray-600 rounded px-2 py-1 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                      >
+                        {CONTROL_ROLE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
 
-                  <span className={`text-[11px] ${source.cls}`}>
-                    {source.text}
-                    {cc.source === 'geometry' && cc.ratio != null && (
-                      <span className="text-gray-500"> ({cc.ratio.toFixed(2)})</span>
-                    )}
-                  </span>
+                      <span className={`text-[11px] ${source.cls}`}>
+                        {source.text}
+                        {cc.source === 'geometry' && cc.ratio != null && (
+                          <span className="text-gray-500"> ({cc.ratio.toFixed(2)})</span>
+                        )}
+                      </span>
 
-                  <span className="text-[11px] text-gray-400 text-right font-mono">
-                    {cc.count}
-                  </span>
-                </div>
-              )
-            })}
+                      <span className="text-[11px] text-gray-400 text-right font-mono">
+                        {cc.count}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </section>
       )}
@@ -642,44 +646,48 @@ export default function CSVPreview() {
             </p>
           </div>
 
-          <div className="grid grid-cols-[80px_1fr_140px_120px] gap-3 text-[11px] font-semibold text-gray-500 uppercase px-2">
-            <span>Color</span>
-            <span>Código</span>
-            <span>Capa DXF</span>
-            <span>Tipo</span>
-          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[480px] flex flex-col gap-3">
+              <div className="grid grid-cols-[80px_1fr_140px_120px] gap-3 text-[11px] font-semibold text-gray-500 uppercase px-2">
+                <span>Color</span>
+                <span>Código</span>
+                <span>Capa DXF</span>
+                <span>Tipo</span>
+              </div>
 
-          <div className="flex flex-col gap-1">
-            {state.codesSummary.map(({ codigo, tipo }) => {
-              const feature = state.featureLibrary[codigo] ?? { color: '#ffffff', capa: codigo }
-              return (
-                <div
-                  key={codigo}
-                  className="grid grid-cols-[80px_1fr_140px_120px] items-center gap-3 bg-gray-800/60 hover:bg-gray-800 rounded-lg px-2 py-2 transition-colors"
-                >
-                  <ColorPicker
-                    value={feature.color}
-                    onChange={(color) => updateFeature(codigo, { color })}
-                  />
+              <div className="flex flex-col gap-1">
+                {state.codesSummary.map(({ codigo, tipo }) => {
+                  const feature = state.featureLibrary[codigo] ?? { color: '#ffffff', capa: codigo }
+                  return (
+                    <div
+                      key={codigo}
+                      className="grid grid-cols-[80px_1fr_140px_120px] items-center gap-3 bg-gray-800/60 hover:bg-gray-800 rounded-lg px-2 py-2 transition-colors"
+                    >
+                      <ColorPicker
+                        value={feature.color}
+                        onChange={(color) => updateFeature(codigo, { color })}
+                      />
 
-                  <span className="font-mono text-xs font-semibold text-blue-300 truncate">
-                    {codigo}
-                  </span>
+                      <span className="font-mono text-xs font-semibold text-blue-300 truncate">
+                        {codigo}
+                      </span>
 
-                  <input
-                    type="text"
-                    value={feature.capa}
-                    onChange={(e) => updateFeature(codigo, { capa: e.target.value.toUpperCase() })}
-                    className="bg-gray-700 hover:bg-gray-600 rounded px-2 py-0.5 text-xs text-gray-200 font-mono outline-none focus:ring-1 focus:ring-blue-500 w-full"
-                    placeholder={codigo}
-                  />
+                      <input
+                        type="text"
+                        value={feature.capa}
+                        onChange={(e) => updateFeature(codigo, { capa: e.target.value.toUpperCase() })}
+                        className="bg-gray-700 hover:bg-gray-600 rounded px-2 py-0.5 text-xs text-gray-200 font-mono outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                        placeholder={codigo}
+                      />
 
-                  <span className={`text-[11px] ${TIPO_COLOR[tipo] ?? 'text-gray-400'}`}>
-                    {tipo}
-                  </span>
-                </div>
-              )
-            })}
+                      <span className={`text-[11px] ${TIPO_COLOR[tipo] ?? 'text-gray-400'}`}>
+                        {tipo}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </section>
       )}

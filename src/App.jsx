@@ -46,6 +46,9 @@ function RehydratingOverlay() {
 
 export default function App() {
   const { state, dispatch } = useApp()
+  // Estado de presentación: cajón lateral en móvil. No afecta a la lógica de la
+  // app (datos, Python, exportación, auth) — solo abre/cierra la sidebar < md.
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   // Lee la sesión guardada de forma síncrona en el primer render, antes de que
   // cualquier efecto pueda modificar localStorage.
@@ -72,8 +75,42 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
-      <aside className="w-64 flex flex-col gap-4 p-4 border-r border-gray-700 overflow-y-auto flex-shrink-0">
+      {/* Barra superior solo en móvil: abre el cajón lateral. */}
+      <header className="md:hidden fixed top-0 inset-x-0 z-30 h-12 flex items-center gap-3 px-4 border-b border-gray-700 bg-gray-900">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Abrir menú"
+          className="text-gray-300 hover:text-white text-xl leading-none"
+        >
+          ☰
+        </button>
         <h1 className="text-lg font-bold tracking-wide">Point2CAD</h1>
+      </header>
+
+      {/* Fondo oscuro que cierra el cajón al tocar fuera (solo móvil). */}
+      {drawerOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/50"
+          onClick={() => setDrawerOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transform transition-transform duration-200 md:static md:z-auto md:translate-x-0 flex flex-col gap-4 p-4 border-r border-gray-700 overflow-y-auto flex-shrink-0 ${
+          drawerOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-bold tracking-wide">Point2CAD</h1>
+          <button
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Cerrar menú"
+            className="md:hidden text-gray-400 hover:text-white text-xl leading-none"
+          >
+            ✕
+          </button>
+        </div>
         <FileUpload />
         <FeatureLibrary />
         {state.appMode === 'viewer' && (
@@ -90,7 +127,7 @@ export default function App() {
         <UserMenu />
       </aside>
 
-      <main className="flex-1 min-w-0 flex flex-col bg-gray-950">
+      <main className="flex-1 min-w-0 flex flex-col bg-gray-950 pt-12 md:pt-0">
         {state.appMode !== 'idle' && <StageStepper />}
         <div className="flex-1 min-h-0">
           <MainArea />

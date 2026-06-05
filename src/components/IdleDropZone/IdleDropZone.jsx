@@ -55,14 +55,14 @@ export default function IdleDropZone() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={() => inputRef.current.click()}
-      className={`flex flex-col items-center justify-center h-full gap-4 m-6 rounded-2xl border-2 border-dashed cursor-pointer transition-colors select-none ${
+      className={`flex flex-col items-center justify-center h-full gap-4 m-4 sm:m-6 rounded-2xl border-2 border-dashed cursor-pointer transition-colors select-none ${
         isDragging
           ? 'border-blue-400 bg-blue-500/10 text-blue-300'
           : 'border-gray-700 hover:border-gray-500 text-gray-500 hover:text-gray-400'
       }`}
     >
       <svg
-        className={`w-20 h-20 transition-transform ${isDragging ? 'scale-110' : 'opacity-50'}`}
+        className={`w-16 h-16 sm:w-20 sm:h-20 transition-transform ${isDragging ? 'scale-110' : 'opacity-50'}`}
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
