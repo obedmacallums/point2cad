@@ -74,7 +74,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-900 text-white">
+    <div className="flex h-dvh bg-gray-900 text-white">
       {/* Barra superior solo en móvil: abre el cajón lateral. */}
       <header className="md:hidden fixed top-0 inset-x-0 z-30 h-12 flex items-center gap-3 px-4 border-b border-gray-700 bg-gray-900">
         <button
