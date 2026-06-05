@@ -336,7 +336,7 @@ export default function Viewer3D() {
           <Html
             position={toLocal([selectedPoint.x, selectedPoint.y, selectedPoint.z])}
             center
-            zIndexRange={[100, 0]}
+            zIndexRange={[20, 0]}
           >
             <div
               style={{
@@ -431,7 +431,7 @@ export default function Viewer3D() {
                 color="#fbbf24"
                 lineWidth={3}
               />
-              <Html position={mid} center zIndexRange={[100, 0]}>
+              <Html position={mid} center zIndexRange={[20, 0]}>
                 <div
                   style={{
                     fontSize: '12px',
