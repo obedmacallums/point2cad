@@ -17,6 +17,17 @@ import MeasurementOverlay from './MeasurementOverlay'
 // hace que se renderice constante sin importar el zoom de cámara.
 const POINT_PIXEL_SIZE = 8
 
+// Radio de selección en píxeles (independiente del tamaño visual del punto). El
+// área clickeable se hace MAYOR que el punto para que sea fácil acertarle: el
+// dedo en táctil es muy poco preciso (~40-50px), así que con puntero grueso lo
+// ampliamos bastante; en escritorio también lo agrandamos un poco respecto al
+// tamaño visual para que sea más cómodo con el mouse sin perder precisión.
+const isCoarsePointer =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(pointer: coarse)').matches
+const HIT_PIXEL_SIZE = isCoarsePointer ? 44 : 12
+
 // Textura circular blanca aplicada como map al PointsMaterial → convierte
 // el cuadrado por defecto de gl_PointSize en un disco. Se multiplica con
 // el color del material, por lo que cada grupo conserva su color.
@@ -37,7 +48,7 @@ const CIRCLE_TEXTURE = (() => {
 // nuestros puntos son constantes en pantalla → recalculamos cada frame el
 // equivalente en mundo del radio visible usando la distancia cámara→target.
 // Sin esto el click area no coincide con lo que el usuario ve.
-function PointsRaycasterTuner({ pixelSize }) {
+function PointsRaycasterTuner({ hitPixelSize }) {
   const { camera, raycaster, size, controls } = useThree()
   useFrame(() => {
     const distance = controls?.target
@@ -45,7 +56,7 @@ function PointsRaycasterTuner({ pixelSize }) {
       : camera.position.length()
     const fov = (camera.fov * Math.PI) / 180
     const worldPerPixel = (2 * distance * Math.tan(fov / 2)) / size.height
-    raycaster.params.Points.threshold = (pixelSize / 2) * worldPerPixel
+    raycaster.params.Points.threshold = (hitPixelSize / 2) * worldPerPixel
   })
   return null
 }
@@ -269,7 +280,7 @@ export default function Viewer3D() {
           cameraRef={cameraRef}
         />
 
-        <PointsRaycasterTuner pixelSize={POINT_PIXEL_SIZE} />
+        <PointsRaycasterTuner hitPixelSize={HIT_PIXEL_SIZE} />
 
         {/* Puntos: un <points> por color (1 draw call por grupo) con tamaño
             constante en pantalla. El índice del punto clickeado viene en
