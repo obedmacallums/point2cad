@@ -33,29 +33,55 @@ export function readFileAsText(file) {
   })
 }
 
+// Genera nombres de columna únicos y no vacíos a partir de los nombres crudos.
+// Los vacíos/espacios pasan a col_N (1-based); los duplicados se desambiguan con
+// sufijo _2, _3, … Esto evita que un header vacío rompa la tabla (TanStack exige
+// un id no vacío) o choque con el centinela "" ("— sin asignar —") del mapeo.
+export function sanitizeHeaders(rawNames, colCount) {
+  const used = new Set()
+  const out = []
+  for (let i = 0; i < colCount; i++) {
+    let base = String(rawNames[i] ?? '').trim()
+    if (!base) base = `col_${i + 1}`
+    let name = base
+    let n = 2
+    while (used.has(name)) {
+      name = `${base}_${n}`
+      n += 1
+    }
+    used.add(name)
+    out.push(name)
+  }
+  return out
+}
+
 // Parsea el CSV sin validar columnas requeridas — eso se decide en el paso de mapeo.
 // opts: { delimiter, hasHeader }
+//
+// Parseamos SIEMPRE como arrays (header:false) y saneamos los nombres de columna
+// nosotros mismos. Así garantizamos que `headers` nunca contiene nombres vacíos
+// ni duplicados, que romperían el render de la tabla o el desplegable de mapeo.
 export function parseCSVPreview(csvText, opts = DEFAULT_PARSE_OPTIONS) {
   const { delimiter, hasHeader } = { ...DEFAULT_PARSE_OPTIONS, ...opts }
 
-  const papaOpts = {
-    skipEmptyLines: true,
-    transformHeader: (h) => h.trim(),
-  }
+  const papaOpts = { skipEmptyLines: true }
   if (delimiter && delimiter !== 'auto') {
     papaOpts.delimiter = delimiter
   }
 
-  if (hasHeader) {
-    const result = Papa.parse(csvText.trim(), { ...papaOpts, header: true })
-    return { headers: result.meta.fields ?? [], rows: result.data }
-  }
-
-  // Sin header: generar nombres sintéticos col_1, col_2, … y reconstruir filas como objetos.
   const result = Papa.parse(csvText.trim(), { ...papaOpts, header: false })
-  const dataRows = result.data
-  const colCount = dataRows.reduce((max, row) => Math.max(max, row.length), 0)
-  const headers = Array.from({ length: colCount }, (_, i) => `col_${i + 1}`)
+  const allRows = result.data
+
+  // Con cabecera, la primera fila aporta los nombres; sin ella, todos son datos
+  // y los nombres salen sintéticos (col_N) vía sanitizeHeaders.
+  const nameRow = hasHeader ? allRows[0] ?? [] : []
+  const dataRows = hasHeader ? allRows.slice(1) : allRows
+
+  const colCount = Math.max(
+    nameRow.length,
+    dataRows.reduce((max, row) => Math.max(max, row.length), 0),
+  )
+  const headers = sanitizeHeaders(nameRow, colCount)
   const rows = dataRows.map((arr) => {
     const obj = {}
     for (let i = 0; i < colCount; i++) obj[headers[i]] = arr[i] ?? ''
@@ -118,13 +144,17 @@ export function normalizeNumber(raw, decimalSeparator = '.') {
 
 // Recorre las filas y reporta las que no cumplen la validación de campos requeridos.
 // Limita la lista detallada a las primeras 50 filas inválidas.
-export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS) {
+export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabledRows = []) {
   const { decimalSeparator } = { ...DEFAULT_PARSE_OPTIONS, ...opts }
+  const disabled = new Set(disabledRows)
   const invalidRows = []
   let invalidCount = 0
+  let totalRows = 0
   const MAX_LISTED = 50
 
   for (let i = 0; i < rows.length; i++) {
+    if (disabled.has(i)) continue // fila desactivada: no entra al proceso
+    totalRows += 1
     const row = rows[i]
     const errors = []
     for (const field of REQUIRED_FIELDS) {
@@ -155,17 +185,20 @@ export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS) {
     }
   }
 
-  return { invalidRows, summary: { totalRows: rows.length, invalidCount } }
+  return { invalidRows, summary: { totalRows, invalidCount } }
 }
 
 // Genera un CSV con headers canónicos y solo las columnas seleccionadas en el mapping.
 // El resultado se manda a Python (csv_parser.parse_csv), que espera ese formato exacto.
 // opts.decimalSeparator: si es ',', convierte los valores numéricos a '.' antes de escribir.
-export function buildCanonicalCSV(headers, rows, mapping, opts = DEFAULT_PARSE_OPTIONS) {
+export function buildCanonicalCSV(headers, rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabledRows = []) {
   const { decimalSeparator } = { ...DEFAULT_PARSE_OPTIONS, ...opts }
+  const disabled = new Set(disabledRows)
   const canonicalHeader = REQUIRED_FIELDS.join(',')
   const lines = [canonicalHeader]
-  for (const row of rows) {
+  for (let r = 0; r < rows.length; r++) {
+    if (disabled.has(r)) continue // fila desactivada: no llega a Python
+    const row = rows[r]
     const cells = REQUIRED_FIELDS.map((field) => {
       const col = mapping[field]
       const raw = col ? row[col] ?? '' : ''

@@ -12,6 +12,7 @@ const PERSISTED_FIELDS = [
   'rawCSVText',
   'parseOptions',
   'columnMapping',
+  'disabledRows',
   'codesSummary',
   'featureLibrary',
   'controlCodes',

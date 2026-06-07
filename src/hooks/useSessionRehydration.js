@@ -30,6 +30,8 @@ export function useSessionRehydration() {
       state.csvHeaders,
       state.rawCSVRows,
       state.columnMapping,
+      state.parseOptions,
+      state.disabledRows,
     )
 
     processCSV(
@@ -51,6 +53,8 @@ export function useSessionRehydration() {
     state.csvHeaders,
     state.rawCSVRows,
     state.columnMapping,
+    state.parseOptions,
+    state.disabledRows,
     state.fileName,
     state.featureLibrary,
     state.controlOverrides,

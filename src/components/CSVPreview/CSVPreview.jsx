@@ -125,10 +125,15 @@ export default function CSVPreview() {
 
   const previewColumns = useMemo(
     () =>
-      (state.csvHeaders ?? []).map((h) => {
+      (state.csvHeaders ?? []).map((h, i) => {
         const mappedField = headerToField[h]
         const accent = mappedField ? FIELD_ACCENT[mappedField] : null
-        return colHelper.accessor(h, {
+        // Accessor de FUNCIÓN (no string): un header string con puntos (p. ej.
+        // "601.53", típico en CSV sin cabecera) TanStack lo interpretaría como
+        // ruta anidada (row["601"]["53"]) → celdas vacías. Leerlo como row[h]
+        // evita eso. El id estable también esquiva headers vacíos/duplicados.
+        return colHelper.accessor((row) => row[h], {
+          id: `col_${i}`,
           header: () => (
             <span className="inline-flex items-center gap-1.5">
               <span>{h.toUpperCase()}</span>
@@ -175,7 +180,10 @@ export default function CSVPreview() {
   const canonicalRows = useMemo(() => {
     const dec = state.parseOptions.decimalSeparator
     const numeric = new Set(['x', 'y', 'z'])
-    const mapped = state.rawCSVRows.map((row) => {
+    const disabled = new Set(state.disabledRows)
+    const mapped = []
+    state.rawCSVRows.forEach((row, idx) => {
+      if (disabled.has(idx)) return // fila eliminada en import: no entra al proceso
       const obj = {}
       for (const field of REQUIRED_FIELDS) {
         const col = state.columnMapping[field]
@@ -186,10 +194,10 @@ export default function CSVPreview() {
           obj[field] = String(raw)
         }
       }
-      return obj
+      mapped.push(obj)
     })
     return previewRowsCount === -1 ? mapped : mapped.slice(0, previewRowsCount)
-  }, [state.rawCSVRows, state.columnMapping, state.parseOptions, previewRowsCount])
+  }, [state.rawCSVRows, state.columnMapping, state.parseOptions, state.disabledRows, previewRowsCount])
 
   // Validación del mapping
   const mappingValues = REQUIRED_FIELDS.map((f) => state.columnMapping[f])
@@ -207,11 +215,12 @@ export default function CSVPreview() {
   // Validación de filas — solo si el mapping está completo y sin conflictos.
   const validation = useMemo(() => {
     if (!mappingComplete || mappingHasConflicts) return null
-    return validateRows(state.rawCSVRows, state.columnMapping, state.parseOptions)
+    return validateRows(state.rawCSVRows, state.columnMapping, state.parseOptions, state.disabledRows)
   }, [
     state.rawCSVRows,
     state.columnMapping,
     state.parseOptions,
+    state.disabledRows,
     mappingComplete,
     mappingHasConflicts,
   ])
@@ -256,7 +265,9 @@ export default function CSVPreview() {
     const canonicalCSV = buildCanonicalCSV(
       state.csvHeaders,
       state.rawCSVRows,
-      state.columnMapping
+      state.columnMapping,
+      state.parseOptions,
+      state.disabledRows
     )
     await detectCodes(canonicalCSV)
   }
@@ -265,7 +276,9 @@ export default function CSVPreview() {
     const canonicalCSV = buildCanonicalCSV(
       state.csvHeaders,
       state.rawCSVRows,
-      state.columnMapping
+      state.columnMapping,
+      state.parseOptions,
+      state.disabledRows
     )
     await processCSV(canonicalCSV, state.fileName, state.featureLibrary, state.controlOverrides)
   }
@@ -279,7 +292,9 @@ export default function CSVPreview() {
     const canonicalCSV = buildCanonicalCSV(
       state.csvHeaders,
       state.rawCSVRows,
-      state.columnMapping
+      state.columnMapping,
+      state.parseOptions,
+      state.disabledRows
     )
     await detectCodes(canonicalCSV, newOverrides, { showDetecting: false })
   }
@@ -321,7 +336,14 @@ export default function CSVPreview() {
         <div>
           <h2 className="text-base font-semibold text-white">{state.fileName}</h2>
           <p className="text-sm text-gray-400 mt-0.5">
-            {state.rawCSVRows.length.toLocaleString()} filas ·{' '}
+            {state.rawCSVRows.length.toLocaleString()} filas
+            {state.disabledRows.length > 0 && (
+              <span className="text-red-400">
+                {' '}· {state.disabledRows.length} desactivada
+                {state.disabledRows.length === 1 ? '' : 's'}
+              </span>
+            )}
+            {' '}·{' '}
             {isCanonicalView ? REQUIRED_FIELDS.length : state.csvHeaders.length} columnas
           </p>
         </div>
@@ -376,6 +398,12 @@ export default function CSVPreview() {
           columns={isCanonicalView ? canonicalColumns : previewColumns}
           data={isCanonicalView ? canonicalRows : previewRows}
           maxHeight={previewRowsCount === -1 || previewRowsCount > 10 ? '420px' : '220px'}
+          isRowDisabled={isCanonicalView ? undefined : (i) => state.disabledRows.includes(i)}
+          onToggleRow={
+            isCanonicalView
+              ? undefined
+              : (i) => dispatch({ type: 'TOGGLE_ROW', payload: i })
+          }
         />
       </section>
 

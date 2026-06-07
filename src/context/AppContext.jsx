@@ -26,12 +26,16 @@ const buildFeatureLibrary = (codesSummary, existing = {}) => {
 }
 
 
-const initialState = {
+export const initialState = {
   appMode: 'idle', // 'idle' | 'preview' | 'detecting' | 'codes_ready' | 'processing' | 'ready' | 'viewer'
 
   rawCSVText: null,
   rawCSVRows: [],
   csvHeaders: [],
+
+  // Índices de filas desactivadas en el preview: no entran a detección, validación
+  // ni al CSV canónico que va a Python. Array (no Set) para serializar en sesión.
+  disabledRows: [],
 
   // Opciones de parsing aplicadas al rawCSVText
   parseOptions: { ...DEFAULT_PARSE_OPTIONS },
@@ -64,7 +68,7 @@ const initialState = {
   fileName: null,
 }
 
-function reducer(state, action) {
+export function reducer(state, action) {
   switch (action.type) {
     case 'SET_CSV_PREVIEW': {
       const { rawCSVText, rows, headers, fileName, parseOptions } = action.payload
@@ -77,6 +81,7 @@ function reducer(state, action) {
         fileName,
         parseOptions: { ...DEFAULT_PARSE_OPTIONS, ...(parseOptions ?? {}) },
         columnMapping: autoDetectMapping(headers),
+        disabledRows: [],
         codesSummary: [],
         featureLibrary: {},
         controlCodes: [],
@@ -102,6 +107,7 @@ function reducer(state, action) {
           csvHeaders: headers,
           rawCSVRows: rows,
           columnMapping: autoDetectMapping(headers),
+          disabledRows: [],
           codesSummary: [],
           featureLibrary: {},
           controlCodes: [],
@@ -134,6 +140,17 @@ function reducer(state, action) {
         lines: [],
         polylines: [],
       }
+
+    case 'TOGGLE_ROW': {
+      const idx = action.payload
+      const has = state.disabledRows.includes(idx)
+      return {
+        ...state,
+        disabledRows: has
+          ? state.disabledRows.filter((i) => i !== idx)
+          : [...state.disabledRows, idx],
+      }
+    }
 
     case 'SET_DETECTING':
       return { ...state, appMode: 'detecting', error: null }
@@ -249,6 +266,8 @@ function reducer(state, action) {
         parseOptions,
         // Preservamos el mapeo guardado en lugar de re-autodetectarlo.
         columnMapping: saved.columnMapping ?? emptyMapping(),
+        // Los índices siguen siendo válidos: aquí se reparsea con las mismas opciones.
+        disabledRows: saved.disabledRows ?? [],
         codesSummary: saved.codesSummary ?? [],
         featureLibrary: saved.featureLibrary ?? {},
         controlCodes: saved.controlCodes ?? [],
@@ -289,6 +308,7 @@ export function AppProvider({ children }) {
     state.rawCSVText,
     state.parseOptions,
     state.columnMapping,
+    state.disabledRows,
     state.codesSummary,
     state.featureLibrary,
     state.controlCodes,
