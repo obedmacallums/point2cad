@@ -10,15 +10,17 @@ por tipo de geometría presente (conservando Z, como el DXF/Shapefile 3D):
   - líneas              → capa "lines"    (LineStringZ)
   - polilíneas cerradas → capa "polygons" (PolygonZ)
 
-No se asigna CRS (crs=None): las coordenadas son UTM planas y el sistema de
-referencia se define al abrir el archivo en el SIG.
+CRS: si `options["epsg"]` trae el código EPSG de la zona UTM (procesamiento de
+coordenadas geodésicas, calculado en JS), se asigna a las capas con
+`crs="EPSG:<código>"`, quedando guardado dentro del .gpkg. Sin EPSG (coordenadas
+proyectadas/planas) se deja crs=None y el sistema de referencia se define al abrir.
 
 Atributos: codigo, capa (y nombre solo en puntos). El atributo color se excluye
 intencionalmente para mantener uniformidad con el generador de Shapefile.
 
 Entrada : geometry (dict) — salida de geometry_builder
           feature_library (dict) — mapa de códigos
-          options (dict|None) — aceptado por uniformidad de firma; no aplica.
+          options (dict|None) — {epsg?: int} (EPSG de la zona UTM, opcional)
 Salida  : .gpkg codificado en base64 (string), para transportarlo por stdout.
 """
 
@@ -52,6 +54,9 @@ def generate_geopackage_b64(geometry: dict, feature_library: dict, options: dict
     if not points and not lines and not polylines:
         raise ValueError("geometry contains no features to export")
 
+    epsg = (options or {}).get("epsg")
+    crs = f"EPSG:{int(epsg)}" if epsg else None
+
     workdir = tempfile.mkdtemp()
     path = os.path.join(workdir, "export.gpkg")
 
@@ -63,7 +68,7 @@ def generate_geopackage_b64(geometry: dict, feature_library: dict, options: dict
                 "nombre": [p.get("nombre", "") for p in points],
             },
             geometry=[Point(p["x"], p["y"], p["z"]) for p in points],
-            crs=None,
+            crs=crs,
         )
         gdf.to_file(path, layer="points", driver="GPKG")
 
@@ -76,7 +81,7 @@ def generate_geopackage_b64(geometry: dict, feature_library: dict, options: dict
             geometry=[
                 LineString([(v[0], v[1], v[2]) for v in line["vertices"]]) for line in lines
             ],
-            crs=None,
+            crs=crs,
         )
         gdf.to_file(path, layer="lines", driver="GPKG")
 
@@ -87,7 +92,7 @@ def generate_geopackage_b64(geometry: dict, feature_library: dict, options: dict
                 "capa": [_capa(feature_library, p["codigo"]) for p in polylines],
             },
             geometry=[Polygon(_closed_ring(p)) for p in polylines],
-            crs=None,
+            crs=crs,
         )
         gdf.to_file(path, layer="polygons", driver="GPKG")
 

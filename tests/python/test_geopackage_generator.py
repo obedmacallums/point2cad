@@ -29,8 +29,8 @@ FEATURE_LIBRARY = {
 }
 
 
-def _write_gpkg(tmp_path):
-    b64 = generate_geopackage_b64(GEOMETRY, FEATURE_LIBRARY)
+def _write_gpkg(tmp_path, options=None):
+    b64 = generate_geopackage_b64(GEOMETRY, FEATURE_LIBRARY, options)
     path = os.path.join(tmp_path, "out.gpkg")
     with open(path, "wb") as f:
         f.write(base64.b64decode(b64))
@@ -84,3 +84,19 @@ def test_lines_z_is_preserved():
     geom = gdf.geometry.iloc[0]
     assert geom.has_z
     assert len(list(geom.coords)) == 3
+
+
+def test_sin_epsg_no_asigna_crs():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _write_gpkg(tmp)
+        gdf = gpd.read_file(path, layer="points")
+    assert gdf.crs is None
+
+
+def test_epsg_se_asigna_a_todas_las_capas():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _write_gpkg(tmp, {"epsg": 32719})
+        for layer in ("points", "lines", "polygons"):
+            gdf = gpd.read_file(path, layer=layer)
+            assert gdf.crs is not None
+            assert gdf.crs.to_epsg() == 32719
