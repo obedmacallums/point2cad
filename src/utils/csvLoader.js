@@ -19,6 +19,11 @@ const FIELD_SYNONYMS = {
 export const REQUIRED_FIELDS = ['nombre', 'x', 'y', 'z', 'codigo']
 const NUMERIC_FIELDS = new Set(['x', 'y', 'z'])
 
+// Código asignado a los puntos sin código: entran al proceso como puntos en vez
+// de bloquear la importación. Python lo mayusculiza a DESCONOCIDO y, al no tener
+// control code ni string number, lo clasifica como Punto.
+export const DEFAULT_CODE = 'desconocido'
+
 export const DEFAULT_PARSE_OPTIONS = {
   delimiter: 'auto',          // 'auto' | ',' | ';' | '\t' | '|'
   decimalSeparator: '.',      // '.' | ','
@@ -238,7 +243,9 @@ export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabl
   const zoneError = merged.coordSystem === 'geodetic' && !zoneInfo
 
   const invalidRows = []
+  const warningRows = []
   let invalidCount = 0
+  let warningCount = 0
   let totalRows = 0
   const MAX_LISTED = 50
 
@@ -249,13 +256,26 @@ export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabl
     const errors = []
 
     // Campos de texto requeridos: solo se exige que no estén vacíos.
+    // 'codigo' es la excepción: un código vacío NO es error, es advertencia
+    // (la fila entra al proceso con DEFAULT_CODE, ver buildCanonicalCSV).
     for (const field of REQUIRED_FIELDS) {
-      if (NUMERIC_FIELDS.has(field)) continue
+      if (NUMERIC_FIELDS.has(field) || field === 'codigo') continue
       const col = mapping[field]
       const raw = col ? row[col] : ''
       const value = raw === undefined || raw === null ? '' : String(raw)
       if (value.trim() === '') {
         errors.push({ field, value, reason: 'vacío' })
+      }
+    }
+
+    // Código vacío → advertencia, sin contribuir a invalidCount.
+    const codCol = mapping.codigo
+    const codRaw = codCol ? row[codCol] : ''
+    const codValue = codRaw === undefined || codRaw === null ? '' : String(codRaw)
+    if (codValue.trim() === '') {
+      warningCount += 1
+      if (warningRows.length < MAX_LISTED) {
+        warningRows.push({ rowIndex: i })
       }
     }
 
@@ -270,7 +290,11 @@ export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabl
     }
   }
 
-  return { invalidRows, summary: { totalRows, invalidCount, zoneError } }
+  return {
+    invalidRows,
+    warningRows,
+    summary: { totalRows, invalidCount, warningCount, zoneError },
+  }
 }
 
 // Genera un CSV con headers canónicos y solo las columnas seleccionadas en el mapping.
@@ -289,12 +313,14 @@ export function buildCanonicalCSV(headers, rows, mapping, opts = DEFAULT_PARSE_O
     if (disabled.has(r)) continue // fila desactivada: no llega a Python
     const row = rows[r]
     const coord = resolveCoords(row, mapping, merged, zoneInfo)
+    const rawCodigo = mapping.codigo ? String(row[mapping.codigo] ?? '') : ''
     const valueByField = {
       nombre: mapping.nombre ? String(row[mapping.nombre] ?? '') : '',
       x: coord.x ?? '',
       y: coord.y ?? '',
       z: coord.z ?? '',
-      codigo: mapping.codigo ? String(row[mapping.codigo] ?? '') : '',
+      // Puntos sin código entran al proceso con el código por defecto.
+      codigo: rawCodigo.trim() === '' ? DEFAULT_CODE : rawCodigo,
     }
     const cells = REQUIRED_FIELDS.map((field) => escapeCSV(String(valueByField[field])))
     lines.push(cells.join(','))

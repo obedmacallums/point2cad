@@ -164,3 +164,34 @@ describe('coordenadas geodésicas', () => {
     expect(cols[2]).toBe('600')
   })
 })
+
+describe('puntos sin código', () => {
+  const headers = ['n', 'x', 'y', 'z', 'c']
+  const mapping = { nombre: 'n', x: 'x', y: 'y', z: 'z', codigo: 'c' }
+
+  it('buildCanonicalCSV rellena el código vacío con DEFAULT_CODE', () => {
+    const rows = [
+      { n: 'P1', x: '1', y: '2', z: '3', c: '' }, // sin código
+      { n: 'P2', x: '4', y: '5', z: '6', c: 'reja' }, // con código
+    ]
+    const csv = buildCanonicalCSV(headers, rows, mapping)
+    const lines = csv.split('\n')
+    expect(lines[1].split(',')[4]).toBe('desconocido')
+    expect(lines[2].split(',')[4]).toBe('reja') // se conserva
+  })
+
+  it('validateRows trata el código vacío como advertencia, no error', () => {
+    const rows = [{ n: 'P1', x: '1', y: '2', z: '3', c: '' }]
+    const { invalidRows, summary } = validateRows(rows, mapping)
+    expect(summary.invalidCount).toBe(0)
+    expect(summary.warningCount).toBe(1)
+    expect(invalidRows).toHaveLength(0)
+  })
+
+  it('el nombre vacío sigue siendo error', () => {
+    const rows = [{ n: '', x: '1', y: '2', z: '3', c: 'A' }]
+    const { summary } = validateRows(rows, mapping)
+    expect(summary.invalidCount).toBe(1)
+    expect(summary.warningCount).toBe(0)
+  })
+})

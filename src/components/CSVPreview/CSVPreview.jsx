@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { useApp } from '../../context/AppContext'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
-import { REQUIRED_FIELDS, buildCanonicalCSV, validateRows, resolveCoords } from '../../utils/csvLoader'
+import { REQUIRED_FIELDS, DEFAULT_CODE, buildCanonicalCSV, validateRows, resolveCoords } from '../../utils/csvLoader'
 import { resolveZone } from '../../utils/geoConvert'
 import DataTable from '../DataTable/DataTable'
 import ColorPicker from '../ColorPicker/ColorPicker'
@@ -229,12 +229,14 @@ export default function CSVPreview() {
     state.rawCSVRows.forEach((row, idx) => {
       if (disabled.has(idx)) return // fila eliminada en import: no entra al proceso
       const coord = resolveCoords(row, state.columnMapping, opts, zoneInfo)
+      const rawCodigo = rawOf(row, 'codigo')
       mapped.push({
         nombre: rawOf(row, 'nombre'),
         x: coord.x || rawOf(row, 'x'),
         y: coord.y || rawOf(row, 'y'),
         z: coord.z || rawOf(row, 'z'),
-        codigo: rawOf(row, 'codigo'),
+        // Refleja la sustitución que hace buildCanonicalCSV para Python.
+        codigo: rawCodigo.trim() === '' ? DEFAULT_CODE : rawCodigo,
       })
     })
     return previewRowsCount === -1 ? mapped : mapped.slice(0, previewRowsCount)
@@ -283,6 +285,9 @@ export default function CSVPreview() {
 
   const invalidCount = validation?.summary.invalidCount ?? 0
   const hasInvalidRows = invalidCount > 0
+
+  const warningCount = validation?.summary.warningCount ?? 0
+  const hasWarningRows = warningCount > 0
 
   const canDetect =
     mappingComplete &&
@@ -721,6 +726,56 @@ export default function CSVPreview() {
           {invalidCount > 10 && (
             <p className="text-[11px] text-gray-500">
               … y {invalidCount - 10} fila{invalidCount - 10 === 1 ? '' : 's'} más con problemas.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* Filas con advertencias — puntos sin código: NO bloquean, entran al
+          proceso como puntos con el código por defecto. Visible antes de detectar. */}
+      {(state.appMode === 'preview' || state.appMode === 'detecting') && hasWarningRows && (
+        <section className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+              Filas con advertencias
+              <span className="ml-2 bg-amber-950/60 text-amber-300 text-[10px] px-1.5 py-0.5 rounded-full font-normal">
+                {warningCount} de {validation.summary.totalRows}
+              </span>
+            </h3>
+            <p className="text-[11px] text-gray-500">
+              Estos puntos no tienen código; se procesarán como puntos con el código «{DEFAULT_CODE}».
+            </p>
+          </div>
+
+          <div className="overflow-x-auto rounded border border-amber-900/60 bg-amber-950/20">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="bg-amber-950/40 text-amber-300 uppercase tracking-wider">
+                  <th className="px-2 py-1 text-left font-semibold">Fila</th>
+                  <th className="px-2 py-1 text-left font-semibold">Campo</th>
+                  <th className="px-2 py-1 text-left font-semibold">Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {validation.warningRows.slice(0, 10).map(({ rowIndex }) => (
+                  <tr
+                    key={rowIndex}
+                    className="border-t border-amber-900/40 text-gray-300"
+                  >
+                    <td className="px-2 py-1 font-mono">
+                      {rowIndex + (state.parseOptions.hasHeader ? 2 : 1)}
+                    </td>
+                    <td className="px-2 py-1 font-mono text-blue-300">codigo</td>
+                    <td className="px-2 py-1 text-amber-300">sin código → {DEFAULT_CODE}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {warningCount > 10 && (
+            <p className="text-[11px] text-gray-500">
+              … y {warningCount - 10} fila{warningCount - 10 === 1 ? '' : 's'} más sin código.
             </p>
           )}
         </section>
