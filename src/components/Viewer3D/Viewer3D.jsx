@@ -10,6 +10,7 @@ import {
 } from '@react-three/drei'
 import { CanvasTexture, Vector3 } from 'three'
 import { useApp } from '../../context/AppContext'
+import { resolveZone } from '../../utils/geoConvert'
 import ViewerToolbar from './ViewerToolbar'
 import MeasurementOverlay from './MeasurementOverlay'
 
@@ -155,6 +156,19 @@ export default function Viewer3D() {
   // y el overlay muestra distancia 3D / planimétrica / ΔZ.
   const [measureMode, setMeasureMode] = useState(false)
   const [measurePoints, setMeasurePoints] = useState([null, null])
+
+  // Zona UTM cuando los datos venían en coordenadas geodésicas: las coordenadas
+  // del visor (y del tooltip) están proyectadas a UTM, así que conviene rotular
+  // el sistema (p.ej. "UTM 19 SUR") y marcar X=Este / Y=Norte en la info del punto.
+  const utmZone = useMemo(() => {
+    if (state.parseOptions.coordSystem !== 'geodetic') return null
+    return resolveZone(
+      state.rawCSVRows,
+      state.columnMapping,
+      state.parseOptions,
+      state.disabledRows,
+    )
+  }, [state.parseOptions, state.rawCSVRows, state.columnMapping, state.disabledRows])
 
   // Activar el modo cierra cualquier tooltip abierto para evitar conflicto.
   // Desactivarlo limpia el par parcial o completo.
@@ -453,10 +467,15 @@ export default function Viewer3D() {
                   {selectedPoint.nombre ?? 'Vértice'}
                 </div>
                 <div style={{ opacity: 0.7 }}>{selectedPoint.codigo}</div>
+                {utmZone && (
+                  <div style={{ marginTop: 4, opacity: 0.7, fontSize: '0.9em' }}>
+                    UTM {utmZone.zone} {utmZone.hemisphere === 'S' ? 'SUR' : 'NORTE'}
+                  </div>
+                )}
                 <div style={{ marginTop: 6, opacity: 0.85 }}>
-                  X: {selectedPoint.x}
+                  X{utmZone ? ' (Este)' : ''}: {selectedPoint.x}
                   <br />
-                  Y: {selectedPoint.y}
+                  Y{utmZone ? ' (Norte)' : ''}: {selectedPoint.y}
                   <br />
                   Z: {selectedPoint.z}
                 </div>
