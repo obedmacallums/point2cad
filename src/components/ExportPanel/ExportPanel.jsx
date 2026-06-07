@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
 import { useApp } from '../../context/AppContext'
 import { usePyodide } from '../../context/PyodideContext'
-import { resolveZone } from '../../utils/geoConvert'
+import { resolveZone, reprojectGeometryToWGS84 } from '../../utils/geoConvert'
 
 // Formatos disponibles en el desplegable (DXF queda por defecto).
 const FORMAT_OPTIONS = [
@@ -96,25 +96,33 @@ export default function ExportPanel() {
   if (!hasAnyGeometry) return null
 
   async function handleExport() {
-    const geometry = { points: exportPoints, lines, polylines }
-    // En coordenadas geodésicas la geometría ya está proyectada a UTM; pasamos el
-    // EPSG de la zona para que los generadores (GeoPackage/Shapefile) lo embeban.
-    // Es la misma zona que se resolvió en el import; aquí solo se reenvía.
-    const epsg =
+    let geometry = { points: exportPoints, lines, polylines }
+    // En coordenadas geodésicas la geometría está proyectada a UTM. Resolvemos la
+    // zona (misma del import) para: (a) pasar el EPSG a GeoPackage/Shapefile y que
+    // lo embeban, (b) reproyectar a WGS84 lon/lat solo el GeoJSON, que exige
+    // WGS84 (RFC 7946). El resto de formatos conserva UTM.
+    const zoneInfo =
       state.parseOptions.coordSystem === 'geodetic'
         ? resolveZone(
             state.rawCSVRows,
             state.columnMapping,
             state.parseOptions,
             state.disabledRows,
-          )?.epsg ?? null
+          )
         : null
+    if (format === 'geojson' && zoneInfo) {
+      geometry = reprojectGeometryToWGS84(
+        geometry,
+        zoneInfo.zone,
+        zoneInfo.hemisphere,
+      )
+    }
     await exportGeometry(
       format,
       geometry,
       exportFeatureLibrary,
       state.fileName ?? 'output.csv',
-      { include_labels: includeLabels, epsg },
+      { include_labels: includeLabels, epsg: zoneInfo?.epsg ?? null },
     )
   }
 

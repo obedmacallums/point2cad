@@ -4,6 +4,8 @@ import {
   utmZoneFromLon,
   epsgForZone,
   projectToUTM,
+  unprojectFromUTM,
+  reprojectGeometryToWGS84,
   resolveZone,
 } from './geoConvert'
 
@@ -61,6 +63,58 @@ describe('projectToUTM', () => {
     const { e, n } = projectToUTM(-70.62, -33.44, 19, 'S')
     expect(e).toBeCloseTo(349414.02, 0) // ~1 m
     expect(n).toBeCloseTo(6298759.56, 0)
+  })
+})
+
+describe('unprojectFromUTM', () => {
+  it('es el inverso de projectToUTM (round-trip exacto)', () => {
+    const lon = -70.62
+    const lat = -33.44
+    const { e, n } = projectToUTM(lon, lat, 19, 'S')
+    const back = unprojectFromUTM(e, n, 19, 'S')
+    expect(back.lon).toBeCloseTo(lon, 6)
+    expect(back.lat).toBeCloseTo(lat, 6)
+  })
+})
+
+describe('reprojectGeometryToWGS84', () => {
+  // Un punto y una línea en UTM 19S (zona de Santiago).
+  const p = projectToUTM(-70.62, -33.44, 19, 'S')
+  const v1 = projectToUTM(-70.60, -33.45, 19, 'S')
+  const geometry = {
+    points: [{ x: p.e, y: p.n, z: 601.5, codigo: 'EJE', nombre: 'P1' }],
+    lines: [
+      {
+        codigo: 'CERCA',
+        vertices: [
+          [p.e, p.n, 601.5],
+          [v1.e, v1.n, 602.0],
+        ],
+      },
+    ],
+    polylines: [],
+  }
+
+  it('reproyecta a lon/lat conservando Z y atributos', () => {
+    const out = reprojectGeometryToWGS84(geometry, 19, 'S')
+    const pt = out.points[0]
+    expect(pt.x).toBeCloseTo(-70.62, 5) // lon
+    expect(pt.y).toBeCloseTo(-33.44, 5) // lat
+    expect(pt.z).toBe(601.5) // altura intacta
+    expect(pt.codigo).toBe('EJE')
+    expect(pt.nombre).toBe('P1')
+
+    const [lon, lat, z] = out.lines[0].vertices[0]
+    expect(lon).toBeCloseTo(-70.62, 5)
+    expect(lat).toBeCloseTo(-33.44, 5)
+    expect(z).toBe(601.5)
+    expect(out.lines[0].codigo).toBe('CERCA')
+  })
+
+  it('no muta la geometría de entrada', () => {
+    const snapshot = JSON.stringify(geometry)
+    reprojectGeometryToWGS84(geometry, 19, 'S')
+    expect(JSON.stringify(geometry)).toBe(snapshot)
   })
 })
 

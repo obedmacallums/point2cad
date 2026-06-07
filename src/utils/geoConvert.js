@@ -88,6 +88,40 @@ export function projectToUTM(lon, lat, zone, hemisphere) {
   return { e, n }
 }
 
+// Inverso de projectToUTM: de UTM métrico (e, n) a (lon, lat) en grados decimales.
+// Se usa al exportar GeoJSON, que exige WGS84 lon/lat (RFC 7946); la geometría en
+// memoria está en UTM, así que hay que volver a grados (incluidos los vértices
+// sintéticos de círculos/arcos/curvas, que solo existen en UTM).
+export function unprojectFromUTM(e, n, zone, hemisphere) {
+  const [lon, lat] = proj4(buildUtmProj(zone, hemisphere), 'WGS84', [e, n])
+  return { lon, lat }
+}
+
+// Devuelve una NUEVA geometría con todas las coordenadas reproyectadas de UTM a
+// WGS84 (lon, lat), conservando Z (altura elipsoidal en metros) y los atributos.
+// No muta la entrada. Para puntos, x→lon e y→lat de modo que generate_geojson
+// (que escribe [x, y, z]) produzca el orden [lon, lat, altura] que pide el RFC.
+export function reprojectGeometryToWGS84(geometry, zone, hemisphere) {
+  const toLonLat = ([e, n, z]) => {
+    const { lon, lat } = unprojectFromUTM(e, n, zone, hemisphere)
+    return [lon, lat, z]
+  }
+  return {
+    points: (geometry.points ?? []).map((p) => {
+      const { lon, lat } = unprojectFromUTM(p.x, p.y, zone, hemisphere)
+      return { ...p, x: lon, y: lat }
+    }),
+    lines: (geometry.lines ?? []).map((l) => ({
+      ...l,
+      vertices: l.vertices.map(toLonLat),
+    })),
+    polylines: (geometry.polylines ?? []).map((pl) => ({
+      ...pl,
+      vertices: pl.vertices.map(toLonLat),
+    })),
+  }
+}
+
 // Determina la zona/hemisferio UTM a usar. Con utmZone='auto' los deriva del
 // primer punto válido del conjunto (saltando filas desactivadas); con valores
 // manuales los respeta (hemisphere='auto' se infiere del signo de la latitud de
