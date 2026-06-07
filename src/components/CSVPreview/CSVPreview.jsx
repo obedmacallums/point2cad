@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { useApp } from '../../context/AppContext'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
-import { REQUIRED_FIELDS, buildCanonicalCSV, validateRows, normalizeNumber } from '../../utils/csvLoader'
+import { REQUIRED_FIELDS, buildCanonicalCSV, validateRows, resolveCoords } from '../../utils/csvLoader'
+import { resolveZone } from '../../utils/geoConvert'
 import DataTable from '../DataTable/DataTable'
 import ColorPicker from '../ColorPicker/ColorPicker'
 
@@ -61,6 +62,40 @@ const DECIMAL_OPTIONS = [
   { value: '.', label: '. (punto)' },
   { value: ',', label: ', (coma)' },
 ]
+
+const COORD_SYSTEM_OPTIONS = [
+  { value: 'projected', label: 'Proyectado (plano, m)' },
+  { value: 'geodetic', label: 'Geodésico (lon, lat · WGS84)' },
+]
+
+const ANGLE_FORMAT_OPTIONS = [
+  { value: 'decimal', label: 'Grados decimales' },
+  { value: 'dms', label: 'Grados-min-seg (DMS)' },
+]
+
+const HEMISPHERE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'N', label: 'Norte' },
+  { value: 'S', label: 'Sur' },
+]
+
+// 'auto' + zonas 1..60
+const UTM_ZONE_OPTIONS = [
+  { value: 'auto', label: 'Auto-detectar' },
+  ...Array.from({ length: 60 }, (_, i) => ({
+    value: String(i + 1),
+    label: String(i + 1),
+  })),
+]
+
+// Etiquetas de los campos x/y/z según el sistema de coordenadas.
+const FIELD_LABELS_GEODETIC = {
+  nombre: 'Nombre',
+  x: 'Longitud',
+  y: 'Latitud',
+  z: 'Altura elipsoidal',
+  codigo: 'Código',
+}
 
 // Color por campo requerido: resalta en la tabla las columnas ya mapeadas.
 const FIELD_ACCENT = {
@@ -166,35 +201,41 @@ export default function CSVPreview() {
 
   // Vista canónica (etapas Detectar/Procesar): solo las columnas ya mapeadas
   // nombre/x/y/z/codigo, con los valores extraídos según el mapeo.
-  const canonicalColumns = useMemo(
-    () =>
-      REQUIRED_FIELDS.map((field) =>
-        colHelper.accessor(field, {
-          header: () => <span>{FIELD_LABELS[field]}</span>,
-          cell: (info) => String(info.getValue() ?? ''),
-        })
-      ),
-    []
-  )
+  const canonicalColumns = useMemo(() => {
+    const labels =
+      state.parseOptions.coordSystem === 'geodetic'
+        ? FIELD_LABELS_GEODETIC
+        : FIELD_LABELS
+    return REQUIRED_FIELDS.map((field) =>
+      colHelper.accessor(field, {
+        header: () => <span>{labels[field]}</span>,
+        cell: (info) => String(info.getValue() ?? ''),
+      })
+    )
+  }, [state.parseOptions.coordSystem])
 
   const canonicalRows = useMemo(() => {
-    const dec = state.parseOptions.decimalSeparator
-    const numeric = new Set(['x', 'y', 'z'])
+    const opts = state.parseOptions
     const disabled = new Set(state.disabledRows)
+    const zoneInfo =
+      opts.coordSystem === 'geodetic'
+        ? resolveZone(state.rawCSVRows, state.columnMapping, opts, state.disabledRows)
+        : null
+    const rawOf = (row, field) => {
+      const col = state.columnMapping[field]
+      return col ? String(row[col] ?? '') : ''
+    }
     const mapped = []
     state.rawCSVRows.forEach((row, idx) => {
       if (disabled.has(idx)) return // fila eliminada en import: no entra al proceso
-      const obj = {}
-      for (const field of REQUIRED_FIELDS) {
-        const col = state.columnMapping[field]
-        const raw = col ? row[col] ?? '' : ''
-        if (numeric.has(field)) {
-          obj[field] = normalizeNumber(raw, dec) ?? String(raw)
-        } else {
-          obj[field] = String(raw)
-        }
-      }
-      mapped.push(obj)
+      const coord = resolveCoords(row, state.columnMapping, opts, zoneInfo)
+      mapped.push({
+        nombre: rawOf(row, 'nombre'),
+        x: coord.x || rawOf(row, 'x'),
+        y: coord.y || rawOf(row, 'y'),
+        z: coord.z || rawOf(row, 'z'),
+        codigo: rawOf(row, 'codigo'),
+      })
     })
     return previewRowsCount === -1 ? mapped : mapped.slice(0, previewRowsCount)
   }, [state.rawCSVRows, state.columnMapping, state.parseOptions, state.disabledRows, previewRowsCount])
@@ -211,6 +252,21 @@ export default function CSVPreview() {
   const delimitersClash =
     state.parseOptions.delimiter !== 'auto' &&
     state.parseOptions.delimiter === state.parseOptions.decimalSeparator
+
+  const isGeodetic = state.parseOptions.coordSystem === 'geodetic'
+  const fieldLabels = isGeodetic ? FIELD_LABELS_GEODETIC : FIELD_LABELS
+
+  // Zona UTM resuelta para mostrar en la UI (solo en modo geodésico y con x/y
+  // mapeadas). Null si aún no se puede determinar.
+  const utmZone = useMemo(() => {
+    if (!isGeodetic || !state.columnMapping.x || !state.columnMapping.y) return null
+    return resolveZone(
+      state.rawCSVRows,
+      state.columnMapping,
+      state.parseOptions,
+      state.disabledRows,
+    )
+  }, [isGeodetic, state.rawCSVRows, state.columnMapping, state.parseOptions, state.disabledRows])
 
   // Validación de filas — solo si el mapping está completo y sin conflictos.
   const validation = useMemo(() => {
@@ -475,6 +531,88 @@ export default function CSVPreview() {
               El separador de columna y el decimal no pueden ser iguales.
             </p>
           )}
+
+          {/* Sistema de coordenadas: proyectado (UTM/plano) o geodésico (lon/lat). */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-[11px] uppercase text-gray-500 font-semibold">
+                Sistema de coordenadas
+              </span>
+              <select
+                value={state.parseOptions.coordSystem}
+                onChange={(e) => updateParseOption('coordSystem', e.target.value)}
+                className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 border border-gray-700"
+              >
+                {COORD_SYSTEM_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </label>
+
+            {isGeodetic && (
+              <>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] uppercase text-gray-500 font-semibold">
+                    Formato de ángulo
+                  </span>
+                  <select
+                    value={state.parseOptions.angleFormat}
+                    onChange={(e) => updateParseOption('angleFormat', e.target.value)}
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 border border-gray-700"
+                  >
+                    {ANGLE_FORMAT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] uppercase text-gray-500 font-semibold">
+                    Zona UTM
+                  </span>
+                  <select
+                    value={state.parseOptions.utmZone}
+                    onChange={(e) => updateParseOption('utmZone', e.target.value)}
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 border border-gray-700"
+                  >
+                    {UTM_ZONE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] uppercase text-gray-500 font-semibold">
+                    Hemisferio
+                  </span>
+                  <select
+                    value={state.parseOptions.hemisphere}
+                    onChange={(e) => updateParseOption('hemisphere', e.target.value)}
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 border border-gray-700"
+                  >
+                    {HEMISPHERE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+          </div>
+
+          {isGeodetic && (
+            <p
+              className={`text-[11px] ${utmZone ? 'text-emerald-400' : 'text-amber-400'}`}
+            >
+              {utmZone
+                ? `Zona UTM ${
+                    state.parseOptions.utmZone === 'auto' ? 'detectada' : 'fijada'
+                  }: ${utmZone.zone} ${utmZone.hemisphere} · EPSG:${utmZone.epsg}. ` +
+                  'La longitud/latitud se proyecta a metros; la altura se conserva tal cual.'
+                : state.columnMapping.x && state.columnMapping.y
+                  ? 'No se pudo determinar la zona UTM: revisa que longitud y latitud sean válidas.'
+                  : 'Asigna las columnas de Longitud y Latitud para detectar la zona UTM.'}
+            </p>
+          )}
         </section>
       )}
 
@@ -509,7 +647,7 @@ export default function CSVPreview() {
                     >
                       {FIELD_BADGE_LABEL[field]}
                     </span>
-                    <span>{FIELD_LABELS[field]}</span>
+                    <span>{fieldLabels[field]}</span>
                   </span>
                   <select
                     value={value}

@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import { parseAngle, projectToUTM, resolveZone } from './geoConvert'
 
 const PALETTE = [
   '#60a5fa', '#4ade80', '#f87171', '#facc15',
@@ -19,9 +20,13 @@ export const REQUIRED_FIELDS = ['nombre', 'x', 'y', 'z', 'codigo']
 const NUMERIC_FIELDS = new Set(['x', 'y', 'z'])
 
 export const DEFAULT_PARSE_OPTIONS = {
-  delimiter: 'auto',        // 'auto' | ',' | ';' | '\t' | '|'
-  decimalSeparator: '.',    // '.' | ','
+  delimiter: 'auto',          // 'auto' | ',' | ';' | '\t' | '|'
+  decimalSeparator: '.',      // '.' | ','
   hasHeader: true,
+  coordSystem: 'projected',   // 'projected' (plano, m) | 'geodetic' (lon/lat WGS84)
+  angleFormat: 'decimal',     // 'decimal' | 'dms'  (solo si coordSystem='geodetic')
+  utmZone: 'auto',            // 'auto' | '1'..'60'
+  hemisphere: 'auto',         // 'auto' | 'N' | 'S'
 }
 
 export function readFileAsText(file) {
@@ -142,11 +147,96 @@ export function normalizeNumber(raw, decimalSeparator = '.') {
   return candidate
 }
 
+// Resuelve los valores canónicos de x/y/z de una fila según el sistema de
+// coordenadas. En 'projected' normaliza los números tal cual; en 'geodetic'
+// interpreta x=lon, y=lat (decimal o DMS) y los proyecta a UTM métrico usando
+// `zoneInfo`, dejando z (altura elipsoidal) sin tocar más que normalizar.
+// Devuelve { x, y, z } como strings canónicos (punto decimal) y `errors` por campo.
+export function resolveCoords(row, mapping, opts, zoneInfo) {
+  const { decimalSeparator, coordSystem, angleFormat } = {
+    ...DEFAULT_PARSE_OPTIONS,
+    ...opts,
+  }
+  const errors = []
+  const rawOf = (field) => {
+    const col = mapping[field]
+    const raw = col ? row[col] : ''
+    return raw === undefined || raw === null ? '' : String(raw)
+  }
+
+  if (coordSystem === 'geodetic') {
+    const rawX = rawOf('x')
+    const rawY = rawOf('y')
+    const rawZ = rawOf('z')
+    const lon = parseAngle(rawX, angleFormat, decimalSeparator)
+    const lat = parseAngle(rawY, angleFormat, decimalSeparator)
+    if (lon === null || Math.abs(lon) > 180) {
+      errors.push({
+        field: 'x',
+        value: rawX,
+        reason: rawX.trim() === '' ? 'vacío' : 'longitud inválida',
+      })
+    }
+    if (lat === null || Math.abs(lat) > 90) {
+      errors.push({
+        field: 'y',
+        value: rawY,
+        reason: rawY.trim() === '' ? 'vacío' : 'latitud inválida',
+      })
+    }
+    const zNorm = normalizeNumber(rawZ, decimalSeparator)
+    if (zNorm === null) {
+      errors.push({
+        field: 'z',
+        value: rawZ,
+        reason: rawZ.trim() === '' ? 'vacío' : 'no es un número válido',
+      })
+    }
+
+    let x = ''
+    let y = ''
+    if (errors.length === 0) {
+      if (!zoneInfo) {
+        errors.push({ field: 'x', value: rawX, reason: 'zona UTM no determinada' })
+      } else {
+        const { e, n } = projectToUTM(lon, lat, zoneInfo.zone, zoneInfo.hemisphere)
+        // Sin redondear: String() da la representación de doble precisión más
+        // corta que round-trippea exacto, preservando toda la precisión.
+        x = String(e)
+        y = String(n)
+      }
+    }
+    return { x, y, z: zNorm ?? '', errors }
+  }
+
+  // Proyectado (plano): cada x/y/z es un número directo.
+  const out = {}
+  for (const field of ['x', 'y', 'z']) {
+    const raw = rawOf(field)
+    const normalized = normalizeNumber(raw, decimalSeparator)
+    if (normalized === null) {
+      errors.push({
+        field,
+        value: raw,
+        reason: raw.trim() === '' ? 'vacío' : 'no es un número válido',
+      })
+    }
+    out[field] = normalized ?? ''
+  }
+  return { x: out.x, y: out.y, z: out.z, errors }
+}
+
 // Recorre las filas y reporta las que no cumplen la validación de campos requeridos.
 // Limita la lista detallada a las primeras 50 filas inválidas.
 export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabledRows = []) {
-  const { decimalSeparator } = { ...DEFAULT_PARSE_OPTIONS, ...opts }
+  const merged = { ...DEFAULT_PARSE_OPTIONS, ...opts }
   const disabled = new Set(disabledRows)
+  const zoneInfo =
+    merged.coordSystem === 'geodetic'
+      ? resolveZone(rows, mapping, merged, disabledRows)
+      : null
+  const zoneError = merged.coordSystem === 'geodetic' && !zoneInfo
+
   const invalidRows = []
   let invalidCount = 0
   let totalRows = 0
@@ -157,26 +247,21 @@ export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabl
     totalRows += 1
     const row = rows[i]
     const errors = []
+
+    // Campos de texto requeridos: solo se exige que no estén vacíos.
     for (const field of REQUIRED_FIELDS) {
+      if (NUMERIC_FIELDS.has(field)) continue
       const col = mapping[field]
       const raw = col ? row[col] : ''
       const value = raw === undefined || raw === null ? '' : String(raw)
-
-      if (NUMERIC_FIELDS.has(field)) {
-        const normalized = normalizeNumber(value, decimalSeparator)
-        if (normalized === null) {
-          errors.push({
-            field,
-            value,
-            reason: value.trim() === '' ? 'vacío' : 'no es un número válido',
-          })
-        }
-      } else {
-        if (value.trim() === '') {
-          errors.push({ field, value, reason: 'vacío' })
-        }
+      if (value.trim() === '') {
+        errors.push({ field, value, reason: 'vacío' })
       }
     }
+
+    // Coordenadas x/y/z (proyectadas o geodésicas).
+    errors.push(...resolveCoords(row, mapping, merged, zoneInfo).errors)
+
     if (errors.length > 0) {
       invalidCount += 1
       if (invalidRows.length < MAX_LISTED) {
@@ -185,29 +270,33 @@ export function validateRows(rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabl
     }
   }
 
-  return { invalidRows, summary: { totalRows, invalidCount } }
+  return { invalidRows, summary: { totalRows, invalidCount, zoneError } }
 }
 
 // Genera un CSV con headers canónicos y solo las columnas seleccionadas en el mapping.
 // El resultado se manda a Python (csv_parser.parse_csv), que espera ese formato exacto.
 // opts.decimalSeparator: si es ',', convierte los valores numéricos a '.' antes de escribir.
 export function buildCanonicalCSV(headers, rows, mapping, opts = DEFAULT_PARSE_OPTIONS, disabledRows = []) {
-  const { decimalSeparator } = { ...DEFAULT_PARSE_OPTIONS, ...opts }
+  const merged = { ...DEFAULT_PARSE_OPTIONS, ...opts }
   const disabled = new Set(disabledRows)
+  const zoneInfo =
+    merged.coordSystem === 'geodetic'
+      ? resolveZone(rows, mapping, merged, disabledRows)
+      : null
   const canonicalHeader = REQUIRED_FIELDS.join(',')
   const lines = [canonicalHeader]
   for (let r = 0; r < rows.length; r++) {
     if (disabled.has(r)) continue // fila desactivada: no llega a Python
     const row = rows[r]
-    const cells = REQUIRED_FIELDS.map((field) => {
-      const col = mapping[field]
-      const raw = col ? row[col] ?? '' : ''
-      if (NUMERIC_FIELDS.has(field)) {
-        const normalized = normalizeNumber(raw, decimalSeparator)
-        return escapeCSV(normalized ?? '')
-      }
-      return escapeCSV(String(raw))
-    })
+    const coord = resolveCoords(row, mapping, merged, zoneInfo)
+    const valueByField = {
+      nombre: mapping.nombre ? String(row[mapping.nombre] ?? '') : '',
+      x: coord.x ?? '',
+      y: coord.y ?? '',
+      z: coord.z ?? '',
+      codigo: mapping.codigo ? String(row[mapping.codigo] ?? '') : '',
+    }
+    const cells = REQUIRED_FIELDS.map((field) => escapeCSV(String(valueByField[field])))
     lines.push(cells.join(','))
   }
   return lines.join('\n')

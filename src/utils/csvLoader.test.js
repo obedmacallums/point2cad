@@ -102,3 +102,65 @@ describe('validateRows con disabledRows', () => {
     expect(summary.totalRows).toBe(2)
   })
 })
+
+describe('coordenadas geodésicas', () => {
+  const mapping = { nombre: 'n', x: 'lon', y: 'lat', z: 'h', codigo: 'c' }
+  const geodeticOpts = {
+    coordSystem: 'geodetic',
+    angleFormat: 'decimal',
+    utmZone: 'auto',
+    hemisphere: 'auto',
+  }
+  const rows = [
+    { n: 'P1', lon: '-70.62', lat: '-33.44', h: '601.5', c: 'EJE' },
+    { n: 'P2', lon: '-70.60', lat: '-33.45', h: '602.0', c: 'EJE' },
+  ]
+
+  it('buildCanonicalCSV proyecta lon/lat a UTM y conserva la altura', () => {
+    const csv = buildCanonicalCSV(['n', 'lon', 'lat', 'h', 'c'], rows, mapping, geodeticOpts)
+    const lines = csv.split('\n')
+    expect(lines[0]).toBe('nombre,x,y,z,codigo')
+    const [nombre, x, y, z, codigo] = lines[1].split(',')
+    expect(nombre).toBe('P1')
+    // E ~349414, N ~6298760 (UTM 19S), altura passthrough
+    expect(Number(x)).toBeCloseTo(349414.02, 0)
+    expect(Number(y)).toBeCloseTo(6298759.56, 0)
+    expect(z).toBe('601.5')
+    expect(codigo).toBe('EJE')
+  })
+
+  it('acepta entrada en DMS', () => {
+    const dmsRows = [{ n: 'P1', lon: '70 37 12 W', lat: '33 26 24 S', h: '601.5', c: 'EJE' }]
+    const csv = buildCanonicalCSV(
+      ['n', 'lon', 'lat', 'h', 'c'],
+      dmsRows,
+      mapping,
+      { ...geodeticOpts, angleFormat: 'dms' },
+    )
+    const cols = csv.split('\n')[1].split(',')
+    // 70°37'12"W = -70.62 ; 33°26'24"S = -33.44 → mismas E/N que el caso decimal
+    expect(Number(cols[1])).toBeCloseTo(349414.02, 0)
+    expect(Number(cols[2])).toBeCloseTo(6298759.56, 0)
+  })
+
+  it('validateRows marca latitud fuera de rango', () => {
+    const badRows = [{ n: 'P1', lon: '-70.62', lat: '120', h: '5', c: 'A' }]
+    const { summary } = validateRows(badRows, mapping, geodeticOpts)
+    expect(summary.invalidCount).toBe(1)
+  })
+
+  it('validateRows señala cuando no se puede determinar la zona', () => {
+    const badRows = [{ n: 'P1', lon: 'foo', lat: 'bar', h: '5', c: 'A' }]
+    const { summary } = validateRows(badRows, mapping, geodeticOpts)
+    expect(summary.zoneError).toBe(true)
+    expect(summary.invalidCount).toBe(1)
+  })
+
+  it('en modo proyectado (default) no transforma', () => {
+    const projRows = [{ n: 'P1', lon: '500', lat: '600', h: '7', c: 'A' }]
+    const csv = buildCanonicalCSV(['n', 'lon', 'lat', 'h', 'c'], projRows, mapping)
+    const cols = csv.split('\n')[1].split(',')
+    expect(cols[1]).toBe('500')
+    expect(cols[2]).toBe('600')
+  })
+})

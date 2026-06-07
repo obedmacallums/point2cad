@@ -98,24 +98,40 @@ export function reducer(state, action) {
       if (!state.rawCSVText) {
         return { ...state, parseOptions: merged }
       }
+      // Cambiar cualquier opción invalida lo que viene después (los códigos y la
+      // geometría dependen de cómo se interpretan las coordenadas).
+      const downstreamReset = {
+        appMode: 'preview',
+        codesSummary: [],
+        featureLibrary: {},
+        controlCodes: [],
+        controlOverrides: {},
+        points: [],
+        lines: [],
+        polylines: [],
+        error: null,
+      }
+      // Solo el delimitador y el flag de encabezados cambian CÓMO se cortan las
+      // filas/columnas. El resto (sistema de coordenadas, formato de ángulo, zona
+      // UTM, separador decimal) no altera la rejilla, así que conservamos el mapeo
+      // y las filas desactivadas en vez de re-autodetectar y perderlos.
+      const STRUCTURAL_KEYS = ['delimiter', 'hasHeader']
+      const structuralChange = STRUCTURAL_KEYS.some(
+        (k) => k in action.payload && action.payload[k] !== state.parseOptions[k],
+      )
+      if (!structuralChange) {
+        return { ...state, ...downstreamReset, parseOptions: merged }
+      }
       try {
         const { headers, rows } = parseCSVPreview(state.rawCSVText, merged)
         return {
           ...state,
-          appMode: 'preview',
+          ...downstreamReset,
           parseOptions: merged,
           csvHeaders: headers,
           rawCSVRows: rows,
           columnMapping: autoDetectMapping(headers),
           disabledRows: [],
-          codesSummary: [],
-          featureLibrary: {},
-          controlCodes: [],
-          controlOverrides: {},
-          points: [],
-          lines: [],
-          polylines: [],
-          error: null,
         }
       } catch (err) {
         return { ...state, parseOptions: merged, error: err.message }
