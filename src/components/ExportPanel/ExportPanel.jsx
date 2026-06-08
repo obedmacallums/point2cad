@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
 import { useApp } from '../../context/AppContext'
 import { usePyodide } from '../../context/PyodideContext'
@@ -12,6 +12,16 @@ const FORMAT_OPTIONS = [
   { value: 'geopackage', label: 'GeoPackage (.gpkg)' },
 ]
 
+// El GeoJSON (RFC 7946) es siempre WGS84 lon/lat: solo tiene sentido cuando el CSV
+// de origen es geodésico (lo reproyectamos a grados al exportar). Con coordenadas
+// planas/proyectadas no hay forma estándar de declarar el CRS, así que el GeoJSON
+// saldría en metros UTM etiquetado como grados (coordenadas erróneas); por eso se
+// oculta el formato en ese caso.
+export function availableFormats(coordSystem) {
+  const isGeodetic = coordSystem === 'geodetic'
+  return FORMAT_OPTIONS.filter((o) => o.value !== 'geojson' || isGeodetic)
+}
+
 export default function ExportPanel() {
   const { exportGeometry, isRunning } = usePythonBridge()
   const { state } = useApp()
@@ -20,6 +30,17 @@ export default function ExportPanel() {
   const [includeLabels, setIncludeLabels] = useState(true)
 
   const isViewer = state.appMode === 'viewer'
+
+  // GeoJSON solo se ofrece con coordenadas geodésicas (ver availableFormats).
+  const formatOptions = availableFormats(state.parseOptions.coordSystem)
+
+  // Si el formato seleccionado deja de estar disponible (p. ej. GeoJSON con datos
+  // proyectados), volvemos a DXF para no quedar con un valor inválido en el select.
+  useEffect(() => {
+    if (!formatOptions.some((o) => o.value === format)) {
+      setFormat('dxf')
+    }
+  }, [formatOptions, format])
 
   // GeoPackage necesita geopandas+fiona; mientras se precargan, se deshabilita
   // el botón y se muestra "Preparando…".
@@ -146,7 +167,7 @@ export default function ExportPanel() {
           disabled={isRunning}
           className="w-full py-1.5 px-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 cursor-pointer"
         >
-          {FORMAT_OPTIONS.map((o) => (
+          {formatOptions.map((o) => (
             <option key={o.value} value={o.value}>
               {o.label}
             </option>
