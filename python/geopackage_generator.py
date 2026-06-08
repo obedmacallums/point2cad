@@ -13,7 +13,9 @@ por tipo de geometría presente (conservando Z, como el DXF/Shapefile 3D):
 CRS: si `options["epsg"]` trae el código EPSG de la zona UTM (procesamiento de
 coordenadas geodésicas, calculado en JS), se asigna a las capas con
 `crs="EPSG:<código>"`, quedando guardado dentro del .gpkg. Sin EPSG (coordenadas
-proyectadas/planas) se deja crs=None y el sistema de referencia se define al abrir.
+proyectadas/planas) GDAL marcaría las capas como SRS geográfico indefinido, lo que
+hace que el GIS intercambie los ejes; por eso se normaliza a "Undefined Cartesian
+SRS" (srs_id -1) para que se traten como planas y el sistema se defina al abrir.
 
 Atributos: codigo, capa (y nombre solo en puntos). El atributo color se excluye
 intencionalmente para mantener uniformidad con el generador de Shapefile.
@@ -26,6 +28,7 @@ Salida  : .gpkg codificado en base64 (string), para transportarlo por stdout.
 
 import base64
 import os
+import sqlite3
 import tempfile
 
 import geopandas as gpd
@@ -34,6 +37,28 @@ from shapely.geometry import LineString, Point, Polygon
 
 def _capa(feature_library: dict, codigo: str) -> str:
     return feature_library.get(codigo, {}).get("capa", codigo)
+
+
+def _force_cartesian_srs(path: str) -> None:
+    """Sin EPSG, GDAL deja las capas con un SRS "indefinido geográfico" (srs_id 0)
+    o "GDAL Undefined SRS" (srs_id 99999, según versión). Si es geográfico, el GIS
+    receptor aplica el orden de ejes lat/lon e intercambia Este/Norte, invirtiendo
+    las coordenadas planas. Reasignamos srs_id -1 = "Undefined Cartesian SRS" (fila
+    estándar del GeoPackage) para que se traten como planas sin reproyección, igual
+    que un Shapefile sin .prj (el GIS les aplica el CRS del proyecto)."""
+    con = sqlite3.connect(path)
+    try:
+        # La fila -1 es obligatoria en el estándar y GDAL la crea; la aseguramos por si acaso.
+        con.execute(
+            "INSERT OR IGNORE INTO gpkg_spatial_ref_sys "
+            "(srs_name, srs_id, organization, organization_coordsys_id, definition) "
+            "VALUES ('Undefined Cartesian SRS', -1, 'NONE', -1, 'undefined')"
+        )
+        con.execute("UPDATE gpkg_contents SET srs_id = -1 WHERE srs_id IN (0, 99999)")
+        con.execute("UPDATE gpkg_geometry_columns SET srs_id = -1 WHERE srs_id IN (0, 99999)")
+        con.commit()
+    finally:
+        con.close()
 
 
 def _closed_ring(poly: dict):
@@ -95,6 +120,11 @@ def generate_geopackage_b64(geometry: dict, feature_library: dict, options: dict
             crs=crs,
         )
         gdf.to_file(path, layer="polygons", driver="GPKG")
+
+    # Sin EPSG (coordenadas proyectadas/planas), normalizamos el SRS indefinido
+    # a cartesiano para que el GIS no intercambie ejes al importar.
+    if not crs:
+        _force_cartesian_srs(path)
 
     with open(path, "rb") as f:
         data = f.read()
