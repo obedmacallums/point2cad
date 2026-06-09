@@ -1,5 +1,5 @@
 // src/utils/sessionStorage.test.js
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { saveSession, loadSession, clearSession } from './sessionStorage'
 
 // Shim de localStorage en memoria (el entorno jsdom de esta config no lo expone).
@@ -12,6 +12,11 @@ beforeEach(() => {
     clear: () => store.clear(),
   }
   clearSession()
+})
+
+// Restaura el global a su estado real (ausente) para no filtrar el shim.
+afterEach(() => {
+  delete globalThis.localStorage
 })
 
 describe('sessionStorage — campos FXL', () => {
