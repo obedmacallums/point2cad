@@ -415,7 +415,7 @@ def classify_codes(
 
     # FXL: autoritativo sobre la heurística (string-number/geometría) pero no
     # sobre un control code explícito en los datos.
-    fxl_types = fxl_types or {}
+    fxl_types = {k.upper(): v for k, v in (fxl_types or {}).items()}
     for base, i in info.items():
         if i["has_control"]:
             continue

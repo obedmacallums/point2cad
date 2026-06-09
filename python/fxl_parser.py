@@ -100,6 +100,6 @@ def parse_fxl(xml_text: str) -> dict:
             color = _argb_to_hex(el.get("Color"))
             if color is None and capa is not None:
                 color = layer_colors.get(capa)
-            features[code] = {"capa": capa, "color": color, "tipo": tipo}
+            features[code.upper()] = {"capa": capa, "color": color, "tipo": tipo}
 
     return {"features": features, "control_roles": control_roles}

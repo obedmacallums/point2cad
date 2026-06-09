@@ -96,3 +96,17 @@ def test_different_namespace_still_parsed():
     assert "CERCA" in out["features"]
     assert out["control_roles"] == {"ini": "start"}
     assert out["features"]["CERCA"]["color"] == "#00ff00"
+
+
+def test_feature_codes_are_uppercased():
+    xml = """<?xml version="1.0" encoding="utf-8"?>
+<FeatureCodingDefinitions xmlns="http://trimble.com/schema/fxl" SchemaVersion="9">
+  <FeatureDefinitions>
+    <LineFeatureDefinition Code="valla" Name="Valla" Layer="VALLAS"/>
+    <PointFeatureDefinition Code="Pt" Name="Punto" Layer="PUNTOS"/>
+  </FeatureDefinitions>
+</FeatureCodingDefinitions>
+"""
+    out = parse_fxl(xml)
+    assert set(out["features"].keys()) == {"VALLA", "PT"}
+    assert out["features"]["VALLA"]["tipo"] == "Línea abierta"

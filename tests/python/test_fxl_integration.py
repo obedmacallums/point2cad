@@ -67,6 +67,13 @@ def test_explicit_control_code_beats_fxl_type():
     assert row["tipo"] == "Línea abierta"
 
 
+def test_fxl_type_lookup_is_case_insensitive():
+    # base se normaliza a mayúsculas; un fxl_types con clave en minúscula igual aplica.
+    summary = detect_codes(PTS_PUNTOS, fxl_types={"pt": "Línea abierta"})
+    row = next(r for r in summary if r["codigo"] == "PT")
+    assert row["tipo"] == "Línea abierta"
+
+
 def test_linear_and_closed_sets_honor_fxl():
     assert "PT" in linear_code_set(PTS_PUNTOS, detect_dialect(PTS_PUNTOS),
                                    fxl_types={"PT": "Línea abierta"})
