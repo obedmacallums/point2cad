@@ -371,14 +371,14 @@ def parse_field_code(codigo: str, dialect: CodingDialect | None = None) -> dict:
 
 def classify_codes(
     points: list[dict], dialect: CodingDialect, model: ControlCodeModel | None = None,
-    overrides: dict | None = None,
+    overrides: dict | None = None, fxl_types: dict | None = None,
 ) -> tuple[dict, list]:
-    """Agrupa los puntos por código base y acumula señales de geometría usando el
-    rol aprendido de cada control code.
+    """Agrupa los puntos por código base y acumula señales de geometría.
 
     Devuelve (info, order) donde info[base] = {count, is_line, is_closed,
-    strings(set)}. Lógica común de `detect_codes` y `build_geometry`.
-    """
+    has_control, strings(set)}. `fxl_types` (código→tipo) es autoritativo sobre
+    la heurística PERO no sobre un control code explícito presente en los datos
+    (has_control)."""
     if model is None:
         model = dialect.fit(points, overrides)
 
@@ -393,7 +393,8 @@ def classify_codes(
         modifier = parsed["modifier"]
 
         if base not in info:
-            info[base] = {"count": 0, "is_line": False, "is_closed": False, "strings": set()}
+            info[base] = {"count": 0, "is_line": False, "is_closed": False,
+                          "has_control": False, "strings": set()}
             order.append(base)
 
         i = info[base]
@@ -403,31 +404,57 @@ def classify_codes(
 
         if model.is_closed_shape(modifier):
             i["is_closed"] = True
+            i["has_control"] = True
         elif modifier is not None and model.role(modifier) is not None:
             # cualquier otro rol reconocido (start/end/join/arc/smooth) → línea
             i["is_line"] = True
+            i["has_control"] = True
         elif parsed["string"]:
             # Códigos con string number suelen ser líneas (convención Trimble)
             i["is_line"] = True
+
+    # FXL: autoritativo sobre la heurística (string-number/geometría) pero no
+    # sobre un control code explícito en los datos.
+    fxl_types = fxl_types or {}
+    for base, i in info.items():
+        if i["has_control"]:
+            continue
+        tipo = fxl_types.get(base)
+        if tipo == TIPO_POLIGONO:
+            i["is_closed"], i["is_line"] = True, False
+        elif tipo == TIPO_LINEA:
+            i["is_line"], i["is_closed"] = True, False
+        elif tipo == TIPO_PUNTO:
+            i["is_line"], i["is_closed"] = False, False
 
     return info, order
 
 
 def linear_code_set(points: list[dict], dialect: CodingDialect,
-                    model: ControlCodeModel | None = None) -> set:
-    """Conjunto de códigos base que son línea o polígono (no punto). Lo usa
-    build_geometry para auto-conectar aunque no haya un control code de inicio."""
-    info, _ = classify_codes(points, dialect, model=model)
+                    model: ControlCodeModel | None = None,
+                    fxl_types: dict | None = None) -> set:
+    """Conjunto de códigos base que son línea o polígono (no punto)."""
+    info, _ = classify_codes(points, dialect, model=model, fxl_types=fxl_types)
     return {base for base, i in info.items() if i["is_line"] or i["is_closed"]}
 
 
-def detect_codes(points: list[dict], overrides: dict | None = None) -> list[dict]:
-    """Clasifica cada código base para la UI. Devuelve
-    [{codigo, cantidad, tipo, cadenas}]. El dialecto se autodetecta; `overrides`
-    (token→rol, de la UI) tiene prioridad."""
+def closed_code_set(points: list[dict], dialect: CodingDialect,
+                    model: ControlCodeModel | None = None,
+                    fxl_types: dict | None = None) -> set:
+    """Conjunto de códigos base que son polígono (línea cerrada). Lo usa
+    build_geometry para cerrar cadenas FXL-poligonales sin terminador explícito."""
+    info, _ = classify_codes(points, dialect, model=model, fxl_types=fxl_types)
+    return {base for base, i in info.items() if i["is_closed"]}
+
+
+def detect_codes(points: list[dict], overrides: dict | None = None,
+                 fxl_roles: dict | None = None,
+                 fxl_types: dict | None = None) -> list[dict]:
+    """Clasifica cada código base para la UI: [{codigo, cantidad, tipo, cadenas}].
+    El dialecto se autodetecta; prioridad usuario → FXL → heurística."""
     dialect = detect_dialect(points)
-    model = dialect.fit(points, overrides)
-    info, order = classify_codes(points, dialect, model=model)
+    model = dialect.fit(points, overrides, fxl_roles)
+    info, order = classify_codes(points, dialect, model=model, fxl_types=fxl_types)
 
     result = []
     for base in order:
