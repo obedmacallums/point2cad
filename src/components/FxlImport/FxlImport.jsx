@@ -31,7 +31,8 @@ export default function FxlImport() {
         <div className="flex items-center gap-2 bg-gray-800 rounded px-2 py-1.5">
           <span className="text-gray-200 truncate">{fxl.fileName}</span>
           <span className="text-gray-500">
-            · {codeCount} códigos · {ctrlCount} control codes
+            · {codeCount} código{codeCount === 1 ? '' : 's'} ·{' '}
+            {ctrlCount} control code{ctrlCount === 1 ? '' : 's'}
           </span>
           <button
             onClick={() => dispatch({ type: 'CLEAR_FXL' })}
