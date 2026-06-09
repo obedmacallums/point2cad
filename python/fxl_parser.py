@@ -20,8 +20,6 @@ TIPO_PUNTO = "Punto"
 TIPO_LINEA = "Línea abierta"
 TIPO_POLIGONO = "Polilínea cerrada"
 
-_NS = "{http://trimble.com/schema/fxl}"
-
 # ControlCodeDefinition Type → rol del proyecto (mismos literales que field_codes).
 _TYPE_TO_ROLE = {
     "Start": "start",
@@ -59,39 +57,49 @@ def _local(tag):
 
 
 def parse_fxl(xml_text: str) -> dict:
+    """Parsea un FXL (XML) y devuelve {features, control_roles}.
+
+    - features: { CODIGO: {capa, color, tipo} } (color "#RRGGBB" o None; un color
+      ausente hereda el de la capa del feature como fallback).
+    - control_roles: { código_de_campo(lower): rol } de los ControlCodeDefinitions.
+
+    El emparejamiento es por nombre local (sin namespace), de modo que tolera
+    FXL sin namespace o con un URI distinto. Lanza ValueError si el XML es inválido.
+    """
     try:
         root = ET.fromstring(xml_text)
     except ET.ParseError as exc:
         raise ValueError(f"FXL no es XML válido: {exc}") from exc
 
-    # Mapa capa→color para usar como fallback del color de un feature.
+    # Una sola pasada por nombre local: las LayerDefinitions preceden a las
+    # FeatureDefinitions en el esquema, así que el mapa capa→color (fallback de
+    # color) ya está construido cuando los features lo consultan.
     layer_colors = {}
-    for layer in root.iter(f"{_NS}LayerDefinition"):
-        name = layer.get("Name")
-        color = _argb_to_hex(layer.get("Color"))
-        if name:
-            layer_colors[name] = color
-
     features = {}
-    for el in root.iter():
-        tipo = _DEF_TIPO.get(_local(el.tag))
-        if tipo is None:
-            continue
-        code = el.get("Code")
-        if not code:
-            continue
-        layer = el.get("Layer")
-        capa = None if layer in (None, "", "0") else layer
-        color = _argb_to_hex(el.get("Color"))
-        if color is None and capa is not None:
-            color = layer_colors.get(capa)
-        features[code] = {"capa": capa, "color": color, "tipo": tipo}
-
     control_roles = {}
-    for cc in root.iter(f"{_NS}ControlCodeDefinition"):
-        code = cc.get("Code")
-        role = _TYPE_TO_ROLE.get(cc.get("Type"))
-        if code and role:
-            control_roles[code.lower()] = role
+    for el in root.iter():
+        name = _local(el.tag)
+        if name == "LayerDefinition":
+            layer_name = el.get("Name")
+            if layer_name:
+                layer_colors[layer_name] = _argb_to_hex(el.get("Color"))
+        elif name == "ControlCodeDefinition":
+            code = el.get("Code")
+            role = _TYPE_TO_ROLE.get(el.get("Type"))
+            if code and role:
+                control_roles[code.lower()] = role
+        else:
+            tipo = _DEF_TIPO.get(name)
+            if tipo is None:
+                continue
+            code = el.get("Code")
+            if not code:
+                continue
+            layer = el.get("Layer")
+            capa = None if layer in (None, "", "0") else layer
+            color = _argb_to_hex(el.get("Color"))
+            if color is None and capa is not None:
+                color = layer_colors.get(capa)
+            features[code] = {"capa": capa, "color": color, "tipo": tipo}
 
     return {"features": features, "control_roles": control_roles}

@@ -61,3 +61,38 @@ def test_control_roles_mapping():
 def test_invalid_xml_raises_valueerror():
     with pytest.raises(ValueError):
         parse_fxl("esto no es xml <<<")
+
+
+def test_invalid_color_degrades_to_none():
+    # Color malformado y sin capa de la que heredar → color None (no crash).
+    xml = """<?xml version="1.0" encoding="utf-8"?>
+<FeatureCodingDefinitions xmlns="http://trimble.com/schema/fxl" SchemaVersion="9">
+  <FeatureDefinitions>
+    <PointFeatureDefinition Code="MALO" Name="Malo" Color="ZZZ"/>
+  </FeatureDefinitions>
+</FeatureCodingDefinitions>
+"""
+    out = parse_fxl(xml)
+    assert out["features"]["MALO"]["color"] is None
+
+
+def test_different_namespace_still_parsed():
+    # Un FXL con OTRO namespace raíz debe seguir entregando features,
+    # control_roles y el fallback de color desde la capa (contrato namespace-agnóstico).
+    xml = """<?xml version="1.0" encoding="utf-8"?>
+<FeatureCodingDefinitions xmlns="http://trimble.com/schema/fxl/v2" SchemaVersion="9">
+  <LayerDefinitions>
+    <LayerDefinition Name="CERCAS" Color="FF00FF00"/>
+  </LayerDefinitions>
+  <ControlCodeDefinitions>
+    <ControlCodeDefinition Code="ini" Type="Start"/>
+  </ControlCodeDefinitions>
+  <FeatureDefinitions>
+    <LineFeatureDefinition Code="CERCA" Name="Cerca" Layer="CERCAS"/>
+  </FeatureDefinitions>
+</FeatureCodingDefinitions>
+"""
+    out = parse_fxl(xml)
+    assert "CERCA" in out["features"]
+    assert out["control_roles"] == {"ini": "start"}
+    assert out["features"]["CERCA"]["color"] == "#00ff00"
