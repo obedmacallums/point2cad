@@ -79,3 +79,39 @@ def test_linear_and_closed_sets_honor_fxl():
                                    fxl_types={"PT": "Línea abierta"})
     assert "PT" in closed_code_set(PTS_PUNTOS, detect_dialect(PTS_PUNTOS),
                                    fxl_types={"PT": "Polilínea cerrada"})
+
+
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.join(_os.path.dirname(__file__), "..", "..", "python"))
+# build_geometry necesita el namespace de shapes + field_codes inyectado en Pyodide;
+# en pytest local importamos las dependencias y las inyectamos en su módulo.
+import field_codes as _fc  # noqa: E402
+import shapes as _shapes  # noqa: E402
+import geometry_builder as _gb  # noqa: E402
+
+for _name in ("detect_dialect", "linear_code_set", "closed_code_set"):
+    setattr(_gb, _name, getattr(_fc, _name))
+for _name in ("circle_from_3_points", "circle_from_center_radius",
+              "arc_from_3_points", "rectangle", "smooth_curve"):
+    setattr(_gb, _name, getattr(_shapes, _name))
+build_geometry = _gb.build_geometry
+
+_TRI = [
+    {"codigo": "ZONA", "x": 0, "y": 0, "z": 0, "nombre": "1"},
+    {"codigo": "ZONA", "x": 10, "y": 0, "z": 0, "nombre": "2"},
+    {"codigo": "ZONA", "x": 10, "y": 10, "z": 0, "nombre": "3"},
+]
+
+
+def test_fxl_polygon_type_emits_polyline_without_close_code():
+    geom = build_geometry(_TRI, {}, fxl_types={"ZONA": "Polilínea cerrada"})
+    assert len(geom["polylines"]) == 1
+    assert len(geom["lines"]) == 0
+    assert geom["polylines"][0]["codigo"] == "ZONA"
+
+
+def test_fxl_line_type_emits_open_line():
+    geom = build_geometry(_TRI, {}, fxl_types={"ZONA": "Línea abierta"})
+    assert len(geom["lines"]) == 1
+    assert len(geom["polylines"]) == 0

@@ -36,19 +36,23 @@ Dependencias inyectadas por el namespace concatenado en Pyodide:
 
 
 def build_geometry(points: list[dict], feature_library: dict,
-                   control_overrides=None, dialect=None) -> dict:
+                   control_overrides=None, dialect=None,
+                   fxl_roles=None, fxl_types=None) -> dict:
     if dialect is None:
         dialect = detect_dialect(points)
 
     # Modelo de roles de control code aprendido del CSV (estructura + léxico +
-    # geometría), con prioridad a los overrides del usuario (UI).
-    model = dialect.fit(points, control_overrides)
+    # geometría), con prioridad a los overrides del usuario (UI) y luego al FXL.
+    model = dialect.fit(points, control_overrides, fxl_roles)
 
     # Códigos que son línea/polígono (misma clasificación que detect_codes). En
     # Trimble Access el linework se auto-conecta por código consecutivo: el
     # primer punto de un código lineal abre la cadena implícitamente, sin
     # necesidad de un control code de inicio; solo el fin/cierre es explícito.
-    linear_codes = linear_code_set(points, dialect, model=model)
+    # `closed_codes` son los códigos cuyo tipo FXL es polígono: se cierran como
+    # polilínea aunque no haya control code de cierre explícito en los datos.
+    linear_codes = linear_code_set(points, dialect, model=model, fxl_types=fxl_types)
+    closed_codes = closed_code_set(points, dialect, model=model, fxl_types=fxl_types)
 
     result: dict[str, list] = {"points": [], "lines": [], "polylines": []}
 
@@ -99,7 +103,11 @@ def build_geometry(points: list[dict], feature_library: dict,
 
         if dens:
             dnames = [""] * len(dens)
-            to_poly = forced == "poly" or (forced is None and closing == "close")
+            to_poly = (
+                forced == "poly"
+                or (forced is None and closing == "close")
+                or (forced is None and closing is None and base in closed_codes)
+            )
             (emit_poly if to_poly else emit_line)(base, dens, dnames)
             return
 
@@ -107,7 +115,11 @@ def build_geometry(points: list[dict], feature_library: dict,
         # cierre (círculo/rect → cerrado, arco → abierto), se respeta aunque la
         # densificación no haya sido posible.
         if len(pts3) >= 2:
-            to_poly = forced == "poly" or (forced != "line" and closing == "close")
+            to_poly = (
+                forced == "poly"
+                or (forced != "line" and closing == "close")
+                or (forced != "line" and closing is None and base in closed_codes)
+            )
             (emit_poly if to_poly else emit_line)(base, pts3, names)
         elif len(pts3) == 1:
             result["points"].append(seq[0])
