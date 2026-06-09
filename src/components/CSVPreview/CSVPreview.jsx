@@ -6,6 +6,7 @@ import { REQUIRED_FIELDS, DEFAULT_CODE, buildCanonicalCSV, validateRows, resolve
 import { resolveZone } from '../../utils/geoConvert'
 import DataTable from '../DataTable/DataTable'
 import ColorPicker from '../ColorPicker/ColorPicker'
+import FxlImport from '../FxlImport/FxlImport'
 
 const colHelper = createColumnHelper()
 
@@ -781,6 +782,10 @@ export default function CSVPreview() {
         </section>
       )}
 
+      <div className="mb-3">
+        <FxlImport />
+      </div>
+
       {/* Códigos de control — detección por defecto (léxico/geometría) con
           opción de reasignar el rol de cada token. Solo en Detectar/Procesar. */}
       {(state.appMode === 'codes_ready' || state.appMode === 'processing') &&
@@ -891,6 +896,11 @@ export default function CSVPreview() {
 
                       <span className="font-mono text-xs font-semibold text-blue-300 truncate">
                         {codigo}
+                        {state.fxl?.features?.[codigo] && (
+                          <span className="ml-1 text-[10px] uppercase tracking-wide text-emerald-400 border border-emerald-700 rounded px-1">
+                            FXL
+                          </span>
+                        )}
                       </span>
 
                       <input
