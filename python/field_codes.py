@@ -212,10 +212,12 @@ class CodingDialect:
             out.append((term, ratio, len(seq)))
         return out
 
-    def fit(self, points: list[dict], overrides: dict | None = None) -> ControlCodeModel:
-        """Aprende el rol de cada control code del CSV. `overrides` (token→rol,
-        de la UI) tiene prioridad sobre el léxico y la geometría."""
+    def fit(self, points: list[dict], overrides: dict | None = None,
+            fxl_roles: dict | None = None) -> ControlCodeModel:
+        """Aprende el rol de cada control code del CSV. Prioridad:
+        `overrides` (usuario) → `fxl_roles` (FXL) → léxico → geometría."""
         overrides = {k.lower(): v for k, v in (overrides or {}).items()}
+        fxl_roles = {k.lower(): v for k, v in (fxl_roles or {}).items()}
 
         first_tokens = set()
         later_counts = {}
@@ -234,6 +236,7 @@ class CodingDialect:
         # Vocabulario de control: tokens en pos≥2 que no sean también features.
         control_vocab = {t for t in later_counts if t not in first_tokens}
         control_vocab |= set(overrides.keys())
+        control_vocab |= set(fxl_roles.keys())
 
         seg_ratios = self._segment_ratios(points)
 
@@ -244,6 +247,9 @@ class CodingDialect:
             if token in overrides:
                 roles[token] = overrides[token]
                 meta[token] = {"source": "override", "ratio": None, "count": count}
+            elif token in fxl_roles:
+                roles[token] = fxl_roles[token]
+                meta[token] = {"source": "fxl", "ratio": None, "count": count}
             elif token in self._lexicon:
                 roles[token] = self._lexicon[token]
                 meta[token] = {"source": "lexicon", "ratio": None, "count": count}
@@ -442,13 +448,14 @@ def detect_codes(points: list[dict], overrides: dict | None = None) -> list[dict
     return result
 
 
-def detect_control_codes(points: list[dict], overrides: dict | None = None) -> list[dict]:
+def detect_control_codes(points: list[dict], overrides: dict | None = None,
+                         fxl_roles: dict | None = None) -> list[dict]:
     """Devuelve los control codes detectados con su rol y la fuente de la
     decisión, para que la UI los muestre y permita reasignarlos:
-      [{token, role, source('override'|'lexicon'|'geometry'), ratio, count}]
+      [{token, role, source('override'|'fxl'|'lexicon'|'geometry'), ratio, count}]
     Ordenados por nº de ocurrencias (descendente)."""
     dialect = detect_dialect(points)
-    model = dialect.fit(points, overrides)
+    model = dialect.fit(points, overrides, fxl_roles)
     out = []
     for token, m in model.meta.items():
         out.append({
