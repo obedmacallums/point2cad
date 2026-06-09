@@ -337,6 +337,8 @@ export function reducer(state, action) {
         featureLibrary: saved.featureLibrary ?? {},
         controlCodes: saved.controlCodes ?? [],
         controlOverrides: saved.controlOverrides ?? {},
+        fxl: saved.fxl ?? null,
+        userEditedCodes: saved.userEditedCodes ?? [],
         fileName: saved.fileName ?? null,
         showLineVertices: saved.showLineVertices ?? false,
         // La geometría se regenera con useSessionRehydration.

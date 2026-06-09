@@ -17,6 +17,8 @@ const PERSISTED_FIELDS = [
   'featureLibrary',
   'controlCodes',
   'controlOverrides',
+  'fxl',
+  'userEditedCodes',
   'fileName',
   'showLineVertices',
 ]
