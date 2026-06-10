@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createColumnHelper } from '@tanstack/react-table'
 import { useApp } from '../../context/AppContext'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
@@ -33,6 +33,7 @@ const SOURCE_LABEL = {
   lexicon:  { text: 'léxico',    cls: 'text-blue-300' },
   geometry: { text: 'geometría', cls: 'text-amber-300' },
   override: { text: 'manual',    cls: 'text-emerald-300' },
+  fxl:      { text: 'FXL',       cls: 'text-emerald-400' },
 }
 
 const ROW_COUNT_OPTIONS = [
@@ -140,6 +141,25 @@ export default function CSVPreview() {
   const { detectCodes, processCSV, isLoading, isRunning } = usePythonBridge()
 
   const [previewRowsCount, setPreviewRowsCount] = useState(5)
+
+  // Si cambia la biblioteca FXL después de haber detectado códigos, re-detecta en
+  // sitio para que la columna "Tipo" y las fuentes de los control codes reflejen
+  // el FXL (la geometría ya usa los hints al procesar). Se omite el primer render.
+  const fxlRef = useRef(state.fxl)
+  useEffect(() => {
+    if (fxlRef.current === state.fxl) return // primer render / sin cambio real
+    fxlRef.current = state.fxl
+    if (state.codesSummary.length === 0) return // aún no se ha detectado
+    if (state.appMode !== 'codes_ready' && state.appMode !== 'processing') return
+    const canonicalCSV = buildCanonicalCSV(
+      state.csvHeaders,
+      state.rawCSVRows,
+      state.columnMapping,
+      state.parseOptions,
+      state.disabledRows,
+    )
+    detectCodes(canonicalCSV, state.controlOverrides, { showDetecting: false })
+  }, [state.fxl]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isDetecting = state.appMode === 'detecting'
   const isProcessing = state.appMode === 'processing' || state.isProcessing
