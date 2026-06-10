@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- Biblioteca de características de ejemplo (creada para pruebas de point2cad).
+     Los códigos coinciden con docs/ejemplo_fxl.csv. No es un archivo de Trimble. -->
+<FeatureCodingDefinitions CreationDate="2026-06-09T00:00:00" DateModified="2026-06-09T00:00:00" SchemaVersion="9" xmlns="http://trimble.com/schema/fxl">
+  <LineStyleDefinitions Version="2" xmlns="http://trimble.com/schema/linestyle">
+    <LineStyleDefinition Name="Solid" Description="Continua">
+      <Units Reference="Ground" Length="Metric" />
+      <PatternType>Default</PatternType>
+    </LineStyleDefinition>
+  </LineStyleDefinitions>
+  <LayerDefinitions>
+    <LayerDefinition Name="VEGETACION" Color="FF1B7A2F" LineStyleName="Solid" />
+    <LayerDefinition Name="MUROS" Color="FFB02418" LineStyleName="Solid" />
+    <LayerDefinition Name="CERCAS" Color="FF0F7FA6" LineStyleName="Solid" />
+    <LayerDefinition Name="BORDES" Color="FFE0A020" LineStyleName="Solid" />
+  </LayerDefinitions>
+  <ControlCodeDefinitions>
+    <ControlCodeDefinition Code="ini" Description="Iniciar secuencia de unión" Type="Start" />
+    <ControlCodeDefinition Code="fin" Description="Finalizar secuencia de unión" Type="End" />
+    <ControlCodeDefinition Code="cer" Description="Cerrar al primer punto" Type="Close" />
+  </ControlCodeDefinitions>
+  <FeatureDefinitions>
+    <PointFeatureDefinition Code="ARBOL" Name="Árbol" Category="Vegetación" Color="FF1B7A2F" Layer="VEGETACION" />
+    <PolygonFeatureDefinition Code="MURO" Name="Muro" Category="Estructuras" Color="FFB02418" Layer="MUROS" />
+    <LineFeatureDefinition Code="CERCA" Name="Cerca" Category="Cierres" Color="FF0F7FA6" Layer="CERCAS" FieldLineStyle="Solid" LineStyleName="Solid" />
+    <LineFeatureDefinition Code="BORDE" Name="Borde" Category="Vialidad" Color="FFE0A020" Layer="BORDES" FieldLineStyle="Solid" LineStyleName="Solid" />
+  </FeatureDefinitions>
+</FeatureCodingDefinitions>
