@@ -13,14 +13,33 @@ const AppContext = createContext(null)
 const emptyMapping = () =>
   Object.fromEntries(REQUIRED_FIELDS.map((f) => [f, null]))
 
-// Construye la featureLibrary preservando el color/capa de los códigos ya
-// presentes (no se pisan las ediciones del usuario al re-detectar tras un
-// override de control code) y asignando color por defecto a los nuevos.
-const buildFeatureLibrary = (codesSummary, existing = {}) => {
+// Construye la featureLibrary con precedencia: edición manual del usuario
+// (userEditedCodes) → FXL (fxl.features) → paleta/código por defecto.
+const buildFeatureLibrary = (codesSummary, existing = {}, fxl = null, userEditedCodes = []) => {
   const defaults = assignColors(codesSummary)
   const lib = {}
   for (const { codigo } of codesSummary) {
-    lib[codigo] = existing[codigo] ?? defaults[codigo]
+    const userEdited = userEditedCodes.includes(codigo)
+    if (userEdited && existing[codigo]) {
+      lib[codigo] = existing[codigo]
+      continue
+    }
+    const visiblePatch =
+      existing[codigo]?.visible !== undefined
+        ? { visible: existing[codigo].visible }
+        : {}
+    const fxlFeature = fxl?.features?.[codigo]
+    if (fxlFeature) {
+      lib[codigo] = {
+        color: fxlFeature.color ?? defaults[codigo].color,
+        capa: fxlFeature.capa ?? codigo,
+        ...visiblePatch,
+      }
+      continue
+    }
+    // Sin edición manual ni FXL: paleta/código por defecto (no se arrastran
+    // valores de un FXL retirado), conservando solo la visibilidad.
+    lib[codigo] = { ...defaults[codigo], ...visiblePatch }
   }
   return lib
 }
@@ -48,6 +67,10 @@ export const initialState = {
 
   // { CODIGO: { color, capa } } — colores asignados en JS al recibir codesSummary
   featureLibrary: {},
+  // Biblioteca FXL importada (opcional): { fileName, features, controlRoles } | null.
+  fxl: null,
+  // Códigos cuyo color/capa editó el usuario a mano (el FXL no los pisa).
+  userEditedCodes: [],
 
   // Control codes detectados (modelo para la UI): [{token, role, source, ratio, count}]
   controlCodes: [],
@@ -84,6 +107,7 @@ export function reducer(state, action) {
         disabledRows: [],
         codesSummary: [],
         featureLibrary: {},
+        userEditedCodes: [],
         controlCodes: [],
         controlOverrides: {},
         points: [],
@@ -178,7 +202,9 @@ export function reducer(state, action) {
         appMode: 'codes_ready',
         codesSummary,
         // Preserva color/capa ya editados; asigna defaults a códigos nuevos.
-        featureLibrary: buildFeatureLibrary(codesSummary, state.featureLibrary),
+        featureLibrary: buildFeatureLibrary(
+          codesSummary, state.featureLibrary, state.fxl, state.userEditedCodes,
+        ),
         controlCodes,
         // controlOverrides se preserva: solo el usuario lo modifica (no se
         // re-siembra con la detección, para no marcar como "manual" lo que no
@@ -196,16 +222,39 @@ export function reducer(state, action) {
         },
       }
 
-    case 'UPDATE_FEATURE':
+    case 'UPDATE_FEATURE': {
+      const { codigo, changes } = action.payload
+      const isManualEdit = 'color' in changes || 'capa' in changes
       return {
         ...state,
         featureLibrary: {
           ...state.featureLibrary,
-          [action.payload.codigo]: {
-            ...state.featureLibrary[action.payload.codigo],
-            ...action.payload.changes,
-          },
+          [codigo]: { ...state.featureLibrary[codigo], ...changes },
         },
+        userEditedCodes:
+          isManualEdit && !state.userEditedCodes.includes(codigo)
+            ? [...state.userEditedCodes, codigo]
+            : state.userEditedCodes,
+      }
+    }
+
+    case 'LOAD_FXL':
+      return {
+        ...state,
+        fxl: action.payload,
+        featureLibrary: buildFeatureLibrary(
+          state.codesSummary, state.featureLibrary, action.payload, state.userEditedCodes,
+        ),
+        error: null,
+      }
+
+    case 'CLEAR_FXL':
+      return {
+        ...state,
+        fxl: null,
+        featureLibrary: buildFeatureLibrary(
+          state.codesSummary, state.featureLibrary, null, state.userEditedCodes,
+        ),
       }
 
     case 'SET_PROCESSING':
@@ -288,6 +337,8 @@ export function reducer(state, action) {
         featureLibrary: saved.featureLibrary ?? {},
         controlCodes: saved.controlCodes ?? [],
         controlOverrides: saved.controlOverrides ?? {},
+        fxl: saved.fxl ?? null,
+        userEditedCodes: saved.userEditedCodes ?? [],
         fileName: saved.fileName ?? null,
         showLineVertices: saved.showLineVertices ?? false,
         // La geometría se regenera con useSessionRehydration.
