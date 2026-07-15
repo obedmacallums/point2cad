@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useApp } from './context/AppContext'
 import FileUpload from './components/FileUpload/FileUpload'
-import Viewer3D from './components/Viewer3D/Viewer3D'
+import ViewerStage from './components/ViewerStage/ViewerStage'
 import CSVPreview from './components/CSVPreview/CSVPreview'
 import ResultsPanel from './components/ResultsPanel/ResultsPanel'
 import FeatureLibrary from './components/FeatureLibrary/FeatureLibrary'
@@ -28,7 +28,7 @@ function MainArea() {
       return <ResultsPanel />
 
     case 'viewer':
-      return <Viewer3D />
+      return <ViewerStage />
 
     default:
       return <IdleDropZone />
