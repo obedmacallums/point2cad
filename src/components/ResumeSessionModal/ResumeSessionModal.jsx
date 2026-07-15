@@ -7,7 +7,7 @@ const STAGE_LABELS = {
   codes_ready: 'Capas',
   processing: 'Resultado',
   ready: 'Resultado',
-  viewer: 'Vista 3D',
+  viewer: 'Vista',
 }
 
 export default function ResumeSessionModal({ fileName, appMode, onContinue, onDiscard }) {

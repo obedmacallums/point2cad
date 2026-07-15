@@ -6,7 +6,7 @@ export const STAGES = [
   { id: 'import', label: 'Importar' },
   { id: 'detect', label: 'Capas' },
   { id: 'process', label: 'Resultado' },
-  { id: 'visualize', label: 'Vista 3D' },
+  { id: 'visualize', label: 'Vista' },
 ]
 
 const STAGE_INDEX = Object.fromEntries(STAGES.map((s, i) => [s.id, i]))
