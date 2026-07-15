@@ -122,6 +122,19 @@ export function reducer(state, action) {
       if (!state.rawCSVText) {
         return { ...state, parseOptions: merged }
       }
+      // En modo plano, el CRS declarado (projectedCrs/zona/hemisferio) solo
+      // afecta a los metadatos de exportación, no al parseo ni a la geometría:
+      // se puede cambiar después de procesar sin invalidar nada.
+      const EXPORT_ONLY_PROJECTED = ['projectedCrs', 'utmZone', 'hemisphere']
+      if (
+        state.parseOptions.coordSystem === 'projected' &&
+        merged.coordSystem === 'projected' &&
+        Object.keys(action.payload).every((k) =>
+          EXPORT_ONLY_PROJECTED.includes(k),
+        )
+      ) {
+        return { ...state, parseOptions: merged }
+      }
       // Cambiar cualquier opción invalida lo que viene después (los códigos y la
       // geometría dependen de cómo se interpretan las coordenadas).
       const downstreamReset = {

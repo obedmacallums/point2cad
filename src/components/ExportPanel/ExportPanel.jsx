@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
 import { useApp } from '../../context/AppContext'
 import { usePyodide } from '../../context/PyodideContext'
@@ -8,18 +8,23 @@ import { resolveZone, reprojectGeometryToWGS84 } from '../../utils/geoConvert'
 const FORMAT_OPTIONS = [
   { value: 'dxf', label: 'DXF' },
   { value: 'geojson', label: 'GeoJSON' },
+  { value: 'kml', label: 'KML (Google Earth)' },
   { value: 'shapefile', label: 'Shapefile (ZIP)' },
   { value: 'geopackage', label: 'GeoPackage (.gpkg)' },
 ]
 
-// El GeoJSON (RFC 7946) es siempre WGS84 lon/lat: solo tiene sentido cuando el CSV
-// de origen es geodésico (lo reproyectamos a grados al exportar). Con coordenadas
-// planas/proyectadas no hay forma estándar de declarar el CRS, así que el GeoJSON
-// saldría en metros UTM etiquetado como grados (coordenadas erróneas); por eso se
-// oculta el formato en ese caso.
-export function availableFormats(coordSystem) {
-  const isGeodetic = coordSystem === 'geodetic'
-  return FORMAT_OPTIONS.filter((o) => o.value !== 'geojson' || isGeodetic)
+// GeoJSON (RFC 7946) y KML son SIEMPRE WGS84 lon/lat: solo existen cuando el
+// CRS de origen es resoluble (geodésico, o plano con UTM declarado en las
+// opciones de importación) para poder reproyectar a grados. Sin CRS quedan
+// deshabilitados con el motivo visible — nunca exportar mal georreferenciado
+// en silencio. DXF/SHP/GPKG conservan las coordenadas originales y no lo
+// necesitan (SHP/GPKG solo ganan georreferencia si hay EPSG).
+const WGS84_ONLY = new Set(['geojson', 'kml'])
+
+export function availableFormats(hasCrs) {
+  return FORMAT_OPTIONS.map((o) =>
+    WGS84_ONLY.has(o.value) ? { ...o, disabled: !hasCrs } : o,
+  )
 }
 
 export default function ExportPanel() {
@@ -31,13 +36,27 @@ export default function ExportPanel() {
 
   const isViewer = state.appMode === 'viewer'
 
-  // GeoJSON solo se ofrece con coordenadas geodésicas (ver availableFormats).
-  const formatOptions = availableFormats(state.parseOptions.coordSystem)
+  // CRS resoluble: geodésico (zona derivada de lon/lat) o plano con UTM
+  // declarado en las opciones de importación. Georreferencia SHP/GPKG y
+  // habilita los formatos WGS84 (GeoJSON, KML).
+  const zoneInfo = useMemo(
+    () =>
+      resolveZone(
+        state.rawCSVRows,
+        state.columnMapping,
+        state.parseOptions,
+        state.disabledRows,
+      ),
+    [state.rawCSVRows, state.columnMapping, state.parseOptions, state.disabledRows],
+  )
 
-  // Si el formato seleccionado deja de estar disponible (p. ej. GeoJSON con datos
-  // proyectados), volvemos a DXF para no quedar con un valor inválido en el select.
+  const formatOptions = availableFormats(zoneInfo !== null)
+
+  // Si el formato seleccionado deja de estar disponible (p. ej. GeoJSON al pasar
+  // a un CSV sin CRS), volvemos a DXF para no quedar con un valor inválido.
   useEffect(() => {
-    if (!formatOptions.some((o) => o.value === format)) {
+    const opt = formatOptions.find((o) => o.value === format)
+    if (!opt || opt.disabled) {
       setFormat('dxf')
     }
   }, [formatOptions, format])
@@ -118,20 +137,12 @@ export default function ExportPanel() {
 
   async function handleExport() {
     let geometry = { points: exportPoints, lines, polylines }
-    // En coordenadas geodésicas la geometría está proyectada a UTM. Resolvemos la
-    // zona (misma del import) para: (a) pasar el EPSG a GeoPackage/Shapefile y que
-    // lo embeban, (b) reproyectar a WGS84 lon/lat solo el GeoJSON, que exige
-    // WGS84 (RFC 7946). El resto de formatos conserva UTM.
-    const zoneInfo =
-      state.parseOptions.coordSystem === 'geodetic'
-        ? resolveZone(
-            state.rawCSVRows,
-            state.columnMapping,
-            state.parseOptions,
-            state.disabledRows,
-          )
-        : null
-    if (format === 'geojson' && zoneInfo) {
+    // La geometría en memoria está en UTM (proyectada al importar geodésico, o
+    // nativa si el CSV era plano). Con CRS resoluble: (a) el EPSG viaja a
+    // GeoPackage/Shapefile para que lo embeban, (b) GeoJSON y KML se
+    // reproyectan a WGS84 lon/lat (ambos formatos lo exigen). El resto de
+    // formatos conserva las coordenadas originales.
+    if (WGS84_ONLY.has(format) && zoneInfo) {
       geometry = reprojectGeometryToWGS84(
         geometry,
         zoneInfo.zone,
@@ -168,24 +179,32 @@ export default function ExportPanel() {
           className="w-full py-1.5 px-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 cursor-pointer"
         >
           {formatOptions.map((o) => (
-            <option key={o.value} value={o.value}>
+            <option key={o.value} value={o.value} disabled={o.disabled}>
               {o.label}
+              {o.disabled ? ' — requiere CRS' : ''}
             </option>
           ))}
         </select>
       </label>
-      {/* La casilla solo aplica a DXF, pero se reserva su espacio siempre
-          (invisible en otros formatos) para que el panel no salte al cambiar. */}
+      {formatOptions.some((o) => o.disabled) && (
+        <p className="text-[11px] text-gray-500">
+          KML y GeoJSON necesitan un sistema de coordenadas conocido: decláralo
+          en Importar CSV (CRS de las coordenadas → UTM) o usa entrada
+          geodésica.
+        </p>
+      )}
+      {/* La casilla aplica a DXF y KML (formatos con etiquetas visibles), pero
+          se reserva su espacio siempre para que el panel no salte al cambiar. */}
       <label
         className={`flex items-center gap-2 text-xs text-gray-300 cursor-pointer ${
-          format === 'dxf' ? '' : 'invisible'
+          format === 'dxf' || format === 'kml' ? '' : 'invisible'
         }`}
       >
         <input
           type="checkbox"
           checked={includeLabels}
           onChange={(e) => setIncludeLabels(e.target.checked)}
-          disabled={isRunning || format !== 'dxf'}
+          disabled={isRunning || (format !== 'dxf' && format !== 'kml')}
           className="accent-emerald-500"
         />
         Incluir etiquetas de nombre

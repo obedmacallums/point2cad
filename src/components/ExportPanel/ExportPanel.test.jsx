@@ -9,16 +9,36 @@ vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('../../context/PyodideContext', () => ({ usePyodide: vi.fn() }))
 vi.mock('../../hooks/usePythonBridge', () => ({ usePythonBridge: vi.fn() }))
 
-function mockState(coordSystem) {
+function mockState(parseOptions, rows = [], mapping = {}) {
   return {
     appMode: 'import',
     points: [{ x: 1, y: 2, z: 0, codigo: 'A', nombre: 'P1' }],
     lines: [],
     polylines: [],
     featureLibrary: { A: { capa: 'A', color: '#fff' } },
-    parseOptions: { coordSystem },
+    parseOptions,
+    rawCSVRows: rows,
+    columnMapping: { nombre: 'n', x: 'x', y: 'y', z: 'z', codigo: 'c', ...mapping },
+    disabledRows: [],
   }
 }
+
+const geodeticState = () =>
+  mockState(
+    { coordSystem: 'geodetic', utmZone: 'auto', hemisphere: 'auto' },
+    [{ x: '-70.62', y: '-33.44' }],
+  )
+
+const localState = () =>
+  mockState({ coordSystem: 'projected', projectedCrs: 'local' })
+
+const declaredUtmState = () =>
+  mockState({
+    coordSystem: 'projected',
+    projectedCrs: 'utm',
+    utmZone: '18',
+    hemisphere: 'S',
+  })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -27,34 +47,51 @@ beforeEach(() => {
 })
 
 describe('availableFormats', () => {
-  it('incluye GeoJSON solo en coordenadas geodésicas', () => {
-    expect(availableFormats('geodetic').map((o) => o.value)).toContain('geojson')
-    expect(availableFormats('projected').map((o) => o.value)).not.toContain(
-      'geojson',
-    )
+  it('con CRS habilita todos los formatos', () => {
+    const opts = availableFormats(true)
+    expect(opts.map((o) => o.value)).toEqual([
+      'dxf', 'geojson', 'kml', 'shapefile', 'geopackage',
+    ])
+    expect(opts.every((o) => !o.disabled)).toBe(true)
   })
 
-  it('mantiene el resto de formatos en ambos casos', () => {
-    for (const cs of ['geodetic', 'projected']) {
-      const values = availableFormats(cs).map((o) => o.value)
-      expect(values).toEqual(expect.arrayContaining(['dxf', 'shapefile', 'geopackage']))
-    }
+  it('sin CRS deshabilita los formatos WGS84 (GeoJSON, KML) y mantiene el resto', () => {
+    const opts = availableFormats(false)
+    const byValue = Object.fromEntries(opts.map((o) => [o.value, o]))
+    expect(byValue.geojson.disabled).toBe(true)
+    expect(byValue.kml.disabled).toBe(true)
+    expect(byValue.dxf.disabled).toBeUndefined()
+    expect(byValue.shapefile.disabled).toBeUndefined()
+    expect(byValue.geopackage.disabled).toBeUndefined()
   })
 })
 
-describe('ExportPanel — disponibilidad de GeoJSON', () => {
-  it('ofrece GeoJSON cuando el CSV es geodésico', () => {
-    useApp.mockReturnValue({ state: mockState('geodetic') })
+describe('ExportPanel — disponibilidad de formatos WGS84', () => {
+  it('geodésico: GeoJSON y KML habilitados', () => {
+    useApp.mockReturnValue({ state: geodeticState() })
     render(<ExportPanel />)
-    expect(screen.getByRole('option', { name: 'GeoJSON' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'GeoJSON' })).toBeEnabled()
+    expect(screen.getByRole('option', { name: /KML/ })).toBeEnabled()
   })
 
-  it('oculta GeoJSON cuando el CSV es proyectado (plano)', () => {
-    useApp.mockReturnValue({ state: mockState('projected') })
+  it('plano sin CRS declarado: GeoJSON y KML deshabilitados con motivo visible', () => {
+    useApp.mockReturnValue({ state: localState() })
     render(<ExportPanel />)
-    expect(screen.queryByRole('option', { name: 'GeoJSON' })).not.toBeInTheDocument()
-    // Los demás formatos siguen disponibles.
-    expect(screen.getByRole('option', { name: 'DXF' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /GeoPackage/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /GeoJSON/ })).toBeDisabled()
+    expect(screen.getByRole('option', { name: /KML/ })).toBeDisabled()
+    expect(screen.getByRole('option', { name: 'DXF' })).toBeEnabled()
+    expect(
+      screen.getByText(/necesitan un sistema de coordenadas conocido/),
+    ).toBeInTheDocument()
+  })
+
+  it('plano con UTM declarado: GeoJSON y KML habilitados', () => {
+    useApp.mockReturnValue({ state: declaredUtmState() })
+    render(<ExportPanel />)
+    expect(screen.getByRole('option', { name: 'GeoJSON' })).toBeEnabled()
+    expect(screen.getByRole('option', { name: /KML/ })).toBeEnabled()
+    expect(
+      screen.queryByText(/necesitan un sistema de coordenadas conocido/),
+    ).not.toBeInTheDocument()
   })
 })

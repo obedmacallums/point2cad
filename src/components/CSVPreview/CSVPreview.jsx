@@ -3,7 +3,7 @@ import { createColumnHelper } from '@tanstack/react-table'
 import { useApp } from '../../context/AppContext'
 import { usePythonBridge } from '../../hooks/usePythonBridge'
 import { REQUIRED_FIELDS, DEFAULT_CODE, buildCanonicalCSV, validateRows, resolveCoords } from '../../utils/csvLoader'
-import { resolveZone } from '../../utils/geoConvert'
+import { resolveZone, looksLikeUTM } from '../../utils/geoConvert'
 import DataTable from '../DataTable/DataTable'
 import ColorPicker from '../ColorPicker/ColorPicker'
 import FxlImport from '../FxlImport/FxlImport'
@@ -88,6 +88,27 @@ const UTM_ZONE_OPTIONS = [
     value: String(i + 1),
     label: String(i + 1),
   })),
+]
+
+// CRS declarable para coordenadas planas. Con 'local' los exports salen sin
+// georreferencia (KML/GeoJSON deshabilitados); con 'utm' el usuario declara
+// zona y hemisferio (de planas no se pueden inferir: un easting existe en las
+// 60 zonas y un northing en ambos hemisferios).
+const PROJECTED_CRS_OPTIONS = [
+  { value: 'local', label: 'Local / sin especificar' },
+  { value: 'utm', label: 'UTM (WGS84)' },
+]
+
+// En modo plano no hay auto-detección posible: 'auto' se muestra como "elegir".
+const PROJECTED_UTM_ZONE_OPTIONS = [
+  { value: 'auto', label: '— elegir —' },
+  ...UTM_ZONE_OPTIONS.slice(1),
+]
+
+const PROJECTED_HEMISPHERE_OPTIONS = [
+  { value: 'auto', label: '— elegir —' },
+  { value: 'N', label: 'Norte' },
+  { value: 'S', label: 'Sur' },
 ]
 
 // Etiquetas de los campos x/y/z según el sistema de coordenadas.
@@ -279,17 +300,33 @@ export default function CSVPreview() {
   const isGeodetic = state.parseOptions.coordSystem === 'geodetic'
   const fieldLabels = isGeodetic ? FIELD_LABELS_GEODETIC : FIELD_LABELS
 
-  // Zona UTM resuelta para mostrar en la UI (solo en modo geodésico y con x/y
-  // mapeadas). Null si aún no se puede determinar.
+  const isProjectedUtm =
+    !isGeodetic && state.parseOptions.projectedCrs === 'utm'
+
+  // Zona UTM resuelta para mostrar en la UI: en geodésico requiere x/y mapeadas
+  // (se deriva del primer punto); en plano solo depende de lo declarado.
   const utmZone = useMemo(() => {
-    if (!isGeodetic || !state.columnMapping.x || !state.columnMapping.y) return null
+    if (isGeodetic && (!state.columnMapping.x || !state.columnMapping.y)) return null
+    if (!isGeodetic && !isProjectedUtm) return null
     return resolveZone(
       state.rawCSVRows,
       state.columnMapping,
       state.parseOptions,
       state.disabledRows,
     )
-  }, [isGeodetic, state.rawCSVRows, state.columnMapping, state.parseOptions, state.disabledRows])
+  }, [isGeodetic, isProjectedUtm, state.rawCSVRows, state.columnMapping, state.parseOptions, state.disabledRows])
+
+  // Plausibilidad de "esto es UTM" para avisar declaraciones erróneas (grilla
+  // local declarada como UTM). Solo aplica en plano con UTM declarado.
+  const utmPlausible = useMemo(() => {
+    if (!isProjectedUtm || !state.columnMapping.x || !state.columnMapping.y) return null
+    return looksLikeUTM(
+      state.rawCSVRows,
+      state.columnMapping,
+      state.parseOptions,
+      state.disabledRows,
+    )
+  }, [isProjectedUtm, state.rawCSVRows, state.columnMapping, state.parseOptions, state.disabledRows])
 
   // Validación de filas — solo si el mapping está completo y sin conflictos.
   const validation = useMemo(() => {
@@ -575,6 +612,57 @@ export default function CSVPreview() {
               </select>
             </label>
 
+            {!isGeodetic && (
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] uppercase text-gray-500 font-semibold">
+                  CRS de las coordenadas
+                </span>
+                <select
+                  value={state.parseOptions.projectedCrs}
+                  onChange={(e) => updateParseOption('projectedCrs', e.target.value)}
+                  className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 border border-gray-700"
+                >
+                  {PROJECTED_CRS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {isProjectedUtm && (
+              <>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] uppercase text-gray-500 font-semibold">
+                    Zona UTM
+                  </span>
+                  <select
+                    value={state.parseOptions.utmZone}
+                    onChange={(e) => updateParseOption('utmZone', e.target.value)}
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 border border-gray-700"
+                  >
+                    {PROJECTED_UTM_ZONE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] uppercase text-gray-500 font-semibold">
+                    Hemisferio
+                  </span>
+                  <select
+                    value={state.parseOptions.hemisphere}
+                    onChange={(e) => updateParseOption('hemisphere', e.target.value)}
+                    className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-blue-500 border border-gray-700"
+                  >
+                    {PROJECTED_HEMISPHERE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
+
             {isGeodetic && (
               <>
                 <label className="flex flex-col gap-1">
@@ -637,6 +725,24 @@ export default function CSVPreview() {
                 : state.columnMapping.x && state.columnMapping.y
                   ? 'No se pudo determinar la zona UTM: revisa que longitud y latitud sean válidas.'
                   : 'Asigna las columnas de Longitud y Latitud para detectar la zona UTM.'}
+            </p>
+          )}
+
+          {isProjectedUtm && (
+            <p
+              className={`text-[11px] ${
+                utmZone && utmPlausible !== false
+                  ? 'text-emerald-400'
+                  : 'text-amber-400'
+              }`}
+            >
+              {!utmZone
+                ? 'Elige zona y hemisferio para georreferenciar los exports (KML, GeoJSON, .prj del Shapefile, EPSG del GeoPackage).'
+                : utmPlausible === false
+                  ? `EPSG:${utmZone.epsg} declarado, pero hay coordenadas fuera del rango UTM ` +
+                    '(easting 160.000–840.000, northing 0–10.000.000): verifica que no sea una grilla local.'
+                  : `Sistema declarado: UTM ${utmZone.zone} ${utmZone.hemisphere} · EPSG:${utmZone.epsg}. ` +
+                    'Las coordenadas no se transforman; solo se georreferencian los exports.'}
             </p>
           )}
         </section>

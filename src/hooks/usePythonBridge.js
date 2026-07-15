@@ -8,6 +8,7 @@ import shapesCode from '../../python/shapes.py?raw'
 import geometryBuilderCode from '../../python/geometry_builder.py?raw'
 import dxfGeneratorCode from '../../python/dxf_generator.py?raw'
 import geojsonGeneratorCode from '../../python/geojson_generator.py?raw'
+import kmlGeneratorCode from '../../python/kml_generator.py?raw'
 import shapefileGeneratorCode from '../../python/shapefile_generator.py?raw'
 import geopackageGeneratorCode from '../../python/geopackage_generator.py?raw'
 import fxlParserCode from '../../python/fxl_parser.py?raw'
@@ -28,6 +29,13 @@ const EXPORT_FORMATS = {
     call: 'generate_geojson(geometry, feature_lib, options)',
     extension: '.geojson',
     mimeType: 'application/geo+json',
+    binary: false,
+  },
+  kml: {
+    generatorCode: kmlGeneratorCode,
+    call: 'generate_kml(geometry, feature_lib, options)',
+    extension: '.kml',
+    mimeType: 'application/vnd.google-earth.kml+xml',
     binary: false,
   },
   shapefile: {

@@ -122,12 +122,27 @@ export function reprojectGeometryToWGS84(geometry, zone, hemisphere) {
   }
 }
 
-// Determina la zona/hemisferio UTM a usar. Con utmZone='auto' los deriva del
-// primer punto válido del conjunto (saltando filas desactivadas); con valores
-// manuales los respeta (hemisphere='auto' se infiere del signo de la latitud de
-// referencia). Devuelve { zone, hemisphere, epsg } o null si no hay punto válido
-// del que partir.
-export function resolveZone(rows, mapping, opts, disabledRows = []) {
+// Determina la zona/hemisferio UTM a usar.
+//
+// Modo geodésico: con utmZone='auto' los deriva del primer punto válido del
+// conjunto (saltando filas desactivadas); con valores manuales los respeta
+// (hemisphere='auto' se infiere del signo de la latitud de referencia).
+//
+// Modo plano (projected): la zona NO puede derivarse de eastings/northings
+// (un easting existe en las 60 zonas y un northing en ambos hemisferios), así
+// que solo hay CRS si el usuario lo declaró: projectedCrs='utm' con zona y
+// hemisferio explícitos ('auto' cuenta como no declarado).
+//
+// Devuelve { zone, hemisphere, epsg } o null si el CRS no es resoluble.
+export function resolveZone(rows = [], mapping = {}, opts = {}, disabledRows = []) {
+  if (opts.coordSystem !== 'geodetic') {
+    if (opts.projectedCrs !== 'utm') return null
+    const zone = parseInt(opts.utmZone, 10)
+    if (!Number.isInteger(zone) || zone < 1 || zone > 60) return null
+    if (opts.hemisphere !== 'N' && opts.hemisphere !== 'S') return null
+    return { zone, hemisphere: opts.hemisphere, epsg: epsgForZone(zone, opts.hemisphere) }
+  }
+
   const disabled = new Set(disabledRows)
   const angleFormat = opts.angleFormat ?? 'decimal'
   const decimalSeparator = opts.decimalSeparator ?? '.'
@@ -166,4 +181,40 @@ export function resolveZone(rows, mapping, opts, disabledRows = []) {
         : 'N'
 
   return { zone, hemisphere, epsg: epsgForZone(zone, hemisphere) }
+}
+
+// Rango plausible de coordenadas UTM: easting con falso este de 500km (el rango
+// real por zona es ~166k–834k) y northing entre el ecuador y el límite del
+// sistema. Se usa para avisar cuando el usuario declara "UTM" sobre datos que
+// claramente no lo son (grilla local de obra, otro sistema proyectado).
+const UTM_EASTING_MIN = 160000
+const UTM_EASTING_MAX = 840000
+const UTM_NORTHING_MIN = 0
+const UTM_NORTHING_MAX = 10000000
+
+// Comprueba si las coordenadas planas del CSV caen en rangos UTM plausibles.
+// Devuelve true/false, o null si no hay ninguna fila con x/y numéricos (sin
+// datos no hay veredicto). No garantiza que SEAN UTM (eso es indecidible);
+// solo detecta lo que seguro no lo es.
+export function looksLikeUTM(rows, mapping, opts, disabledRows = []) {
+  const disabled = new Set(disabledRows)
+  const decimalSeparator = opts.decimalSeparator ?? '.'
+  let checked = 0
+  for (let i = 0; i < rows.length; i++) {
+    if (disabled.has(i)) continue
+    const row = rows[i]
+    const e = parseDecimalDeg(row[mapping.x], decimalSeparator)
+    const n = parseDecimalDeg(row[mapping.y], decimalSeparator)
+    if (e === null || n === null) continue
+    checked++
+    if (
+      e < UTM_EASTING_MIN ||
+      e > UTM_EASTING_MAX ||
+      n < UTM_NORTHING_MIN ||
+      n > UTM_NORTHING_MAX
+    ) {
+      return false
+    }
+  }
+  return checked > 0 ? true : null
 }

@@ -32,6 +32,10 @@ export const DEFAULT_PARSE_OPTIONS = {
   angleFormat: 'decimal',     // 'decimal' | 'dms'  (solo si coordSystem='geodetic')
   utmZone: 'auto',            // 'auto' | '1'..'60'
   hemisphere: 'auto',         // 'auto' | 'N' | 'S'
+  // Solo para coordSystem='projected': CRS declarado por el usuario. 'local'
+  // = desconocido/grilla de obra (exports sin georreferencia); 'utm' usa
+  // utmZone/hemisphere (explícitos) para georreferenciar KML/GeoJSON/.prj.
+  projectedCrs: 'local',      // 'local' | 'utm'
 }
 
 export function readFileAsText(file) {

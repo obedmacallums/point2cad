@@ -91,6 +91,34 @@ describe('SET_PARSE_OPTIONS', () => {
     expect(Object.values(next.columnMapping).every((v) => v === null)).toBe(true)
   })
 
+  it('declarar CRS en modo plano NO invalida códigos ni geometría (solo export)', () => {
+    const state = { ...detectedState(), points: [{ x: 1 }] }
+    const next = reducer(state, {
+      type: 'SET_PARSE_OPTIONS',
+      payload: { projectedCrs: 'utm', utmZone: '18', hemisphere: 'S' },
+    })
+    expect(next.parseOptions.projectedCrs).toBe('utm')
+    expect(next.parseOptions.utmZone).toBe('18')
+    expect(next.codesSummary).toEqual(state.codesSummary)
+    expect(next.featureLibrary).toEqual(state.featureLibrary)
+    expect(next.points).toEqual([{ x: 1 }])
+    expect(next.appMode).toBe(state.appMode)
+  })
+
+  it('en modo geodésico cambiar la zona SÍ invalida (afecta la proyección)', () => {
+    const base = detectedState()
+    const state = {
+      ...base,
+      parseOptions: { ...base.parseOptions, coordSystem: 'geodetic' },
+    }
+    const next = reducer(state, {
+      type: 'SET_PARSE_OPTIONS',
+      payload: { utmZone: '18' },
+    })
+    expect(next.codesSummary).toEqual([])
+    expect(next.appMode).toBe('preview')
+  })
+
   it('sin CSV cargado solo actualiza las opciones', () => {
     const next = reducer(initialState, {
       type: 'SET_PARSE_OPTIONS',

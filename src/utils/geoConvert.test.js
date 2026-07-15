@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { looksLikeUTM } from './geoConvert'
 import {
   parseAngle,
   utmZoneFromLon,
@@ -118,30 +119,107 @@ describe('reprojectGeometryToWGS84', () => {
   })
 })
 
-describe('resolveZone', () => {
+describe('resolveZone (geodésico)', () => {
   const mapping = { x: 'lon', y: 'lat' }
+  const geo = { coordSystem: 'geodetic' }
   const rows = [
     { lon: '-70.62', lat: '-33.44' },
     { lon: '-70.60', lat: '-33.45' },
   ]
 
   it('auto-detecta zona y hemisferio del primer punto válido', () => {
-    const z = resolveZone(rows, mapping, { utmZone: 'auto', hemisphere: 'auto' })
+    const z = resolveZone(rows, mapping, { ...geo, utmZone: 'auto', hemisphere: 'auto' })
     expect(z).toEqual({ zone: 19, hemisphere: 'S', epsg: 32719 })
   })
 
   it('respeta override manual de zona/hemisferio', () => {
-    const z = resolveZone(rows, mapping, { utmZone: '18', hemisphere: 'N' })
+    const z = resolveZone(rows, mapping, { ...geo, utmZone: '18', hemisphere: 'N' })
     expect(z).toEqual({ zone: 18, hemisphere: 'N', epsg: 32618 })
   })
 
   it('salta filas desactivadas para el punto de referencia', () => {
-    const z = resolveZone(rows, mapping, { utmZone: 'auto', hemisphere: 'auto' }, [0])
+    const z = resolveZone(rows, mapping, { ...geo, utmZone: 'auto', hemisphere: 'auto' }, [0])
     expect(z.zone).toBe(19)
   })
 
   it('devuelve null si no hay ningún punto válido', () => {
     const bad = [{ lon: 'x', lat: 'y' }]
-    expect(resolveZone(bad, mapping, { utmZone: 'auto', hemisphere: 'auto' })).toBeNull()
+    expect(resolveZone(bad, mapping, { ...geo, utmZone: 'auto', hemisphere: 'auto' })).toBeNull()
+  })
+})
+
+describe('resolveZone (plano con CRS declarado)', () => {
+  const mapping = { x: 'x', y: 'y' }
+  const rows = [{ x: '350000', y: '6250000' }]
+
+  it('resuelve zona/hemisferio declarados por el usuario', () => {
+    const z = resolveZone(rows, mapping, {
+      coordSystem: 'projected',
+      projectedCrs: 'utm',
+      utmZone: '18',
+      hemisphere: 'S',
+    })
+    expect(z).toEqual({ zone: 18, hemisphere: 'S', epsg: 32718 })
+  })
+
+  it('sin declarar CRS (local) devuelve null', () => {
+    const z = resolveZone(rows, mapping, {
+      coordSystem: 'projected',
+      projectedCrs: 'local',
+      utmZone: '18',
+      hemisphere: 'S',
+    })
+    expect(z).toBeNull()
+  })
+
+  it("con zona u hemisferio en 'auto' no hay CRS (no se puede inferir de planas)", () => {
+    const base = { coordSystem: 'projected', projectedCrs: 'utm' }
+    expect(
+      resolveZone(rows, mapping, { ...base, utmZone: 'auto', hemisphere: 'S' }),
+    ).toBeNull()
+    expect(
+      resolveZone(rows, mapping, { ...base, utmZone: '18', hemisphere: 'auto' }),
+    ).toBeNull()
+  })
+})
+
+describe('looksLikeUTM', () => {
+  const mapping = { x: 'x', y: 'y' }
+  const opts = { decimalSeparator: '.' }
+
+  it('true con eastings/northings en rango UTM', () => {
+    const rows = [
+      { x: '350000.5', y: '6250000.2' },
+      { x: '351000', y: '6251000' },
+    ]
+    expect(looksLikeUTM(rows, mapping, opts)).toBe(true)
+  })
+
+  it('false con coordenadas de grilla local (base 1000/2000)', () => {
+    const rows = [{ x: '1000', y: '2000' }]
+    expect(looksLikeUTM(rows, mapping, opts)).toBe(false)
+  })
+
+  it('false si el northing excede el límite del sistema', () => {
+    const rows = [{ x: '350000', y: '12000000' }]
+    expect(looksLikeUTM(rows, mapping, opts)).toBe(false)
+  })
+
+  it('null sin ninguna fila numérica', () => {
+    const rows = [{ x: 'abc', y: '' }]
+    expect(looksLikeUTM(rows, mapping, opts)).toBeNull()
+  })
+
+  it('ignora filas desactivadas', () => {
+    const rows = [
+      { x: '1000', y: '2000' },
+      { x: '350000', y: '6250000' },
+    ]
+    expect(looksLikeUTM(rows, mapping, opts, [0])).toBe(true)
+  })
+
+  it('respeta el separador decimal coma', () => {
+    const rows = [{ x: '350000,5', y: '6250000,2' }]
+    expect(looksLikeUTM(rows, mapping, { decimalSeparator: ',' })).toBe(true)
   })
 })
