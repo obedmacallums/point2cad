@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { deriveAuthStatus } from '../lib/authStatus'
+import { isSupabaseDown } from '../lib/health'
 
 const AuthContext = createContext(null)
 
@@ -9,18 +10,29 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [profileError, setProfileError] = useState(null)
+  const [supabaseDown, setSupabaseDown] = useState(false)
   const recordedFor = useRef(null)
 
   async function loadProfile(userId) {
+    if (!supabase) return
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single()
     if (error) {
+      // Distinguir "Supabase pausado/caído" (→ modo abierto) de un error real
+      // del perfil (→ pantalla de error con reintento). Lo decide la sonda.
+      if (await isSupabaseDown()) {
+        setSupabaseDown(true)
+        setProfileError(null)
+        setProfile(null)
+        return
+      }
       setProfileError(error)
       setProfile(null)
     } else {
+      setSupabaseDown(false)
       setProfileError(null)
       setProfile(data)
     }
@@ -29,7 +41,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let active = true
 
-    supabase.auth.getSession().then(({ data }) => {
+    // Sin cliente (faltan las vars VITE_SUPABASE_*) no hay forma de autenticar:
+    // directo a modo abierto, sin sondear nada.
+    if (!supabase) {
+      setSupabaseDown(true)
+      setInitializing(false)
+      return
+    }
+
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return
       const s = data.session
       setSession(s)
@@ -38,6 +58,13 @@ export function AuthProvider({ children }) {
           if (active) setInitializing(false)
         })
       } else {
+        // Sin sesión local no hay ninguna llamada que falle "sola": sondeamos
+        // antes de mostrar el login para no exigir credenciales imposibles
+        // cuando Supabase está pausado. Se resuelve antes de cerrar el loading
+        // para no parpadear el LoginScreen.
+        const down = await isSupabaseDown()
+        if (!active) return
+        setSupabaseDown(down)
         setInitializing(false)
       }
     })
@@ -69,15 +96,15 @@ export function AuthProvider({ children }) {
   const value = {
     session,
     profile,
-    status: deriveAuthStatus({ initializing, session, profile, profileError }),
+    status: deriveAuthStatus({ initializing, session, profile, profileError, supabaseDown }),
     signInWithGoogle: () =>
-      supabase.auth.signInWithOAuth({
+      supabase?.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: window.location.origin + import.meta.env.BASE_URL,
         },
       }),
-    signOut: () => supabase.auth.signOut(),
+    signOut: () => supabase?.auth.signOut(),
     retry: () => {
       if (session) loadProfile(session.user.id)
     },

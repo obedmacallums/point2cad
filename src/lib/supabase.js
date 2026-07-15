@@ -8,10 +8,16 @@ if (!url || !anonKey) {
   console.warn('Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY')
 }
 
-export const supabase = createClient(url, anonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-})
+// Sin configuración, createClient lanza y la app moriría en pantalla blanca
+// antes de montar React. Exportamos null y AuthContext lo trata como
+// "Supabase caído" → modo abierto (misma política que lib/health.js).
+export const supabase =
+  url && anonKey
+    ? createClient(url, anonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      })
+    : null

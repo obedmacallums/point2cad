@@ -44,6 +44,19 @@ describe('deriveAuthStatus', () => {
     ).toBe('allowed')
   })
 
+  it('devuelve open si Supabase está caído, sin importar lo demás', () => {
+    expect(
+      deriveAuthStatus({ initializing: true, supabaseDown: true }),
+    ).toBe('open')
+    expect(
+      deriveAuthStatus({
+        initializing: false,
+        session: null,
+        supabaseDown: true,
+      }),
+    ).toBe('open')
+  })
+
   it('devuelve denied si el perfil está inactivo', () => {
     expect(
       deriveAuthStatus({

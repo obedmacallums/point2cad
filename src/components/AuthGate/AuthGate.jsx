@@ -13,6 +13,12 @@ export default function AuthGate({ children }) {
     return children
   }
 
+  // Supabase pausado o inalcanzable (plan free sin tráfico): acceso libre.
+  // Mejor una app abierta que una app muerta detrás de un login que no puede
+  // responder. Cuando el servicio vuelve, la autenticación se reactiva sola
+  // en la siguiente visita.
+  if (status === 'open') return children
+
   if (status === 'loading') {
     return (
       <FullScreen>

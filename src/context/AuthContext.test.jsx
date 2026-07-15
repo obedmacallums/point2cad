@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { AuthProvider, useAuth } from './AuthContext'
 import { supabase, singleMock } from '../lib/supabase'
+import { isSupabaseDown } from '../lib/health'
+
+// Mock de la sonda de disponibilidad: por defecto Supabase está "vivo".
+vi.mock('../lib/health', () => ({ isSupabaseDown: vi.fn() }))
 
 // Mock del cliente Supabase. `singleMock` controla la respuesta del perfil.
 vi.mock('../lib/supabase', () => {
@@ -42,6 +46,7 @@ const session = { user: { id: 'u1' } }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  isSupabaseDown.mockResolvedValue(false)
 })
 
 describe('AuthProvider', () => {
@@ -71,12 +76,40 @@ describe('AuthProvider', () => {
     )
   })
 
-  it('queda en error si la carga del perfil falla', async () => {
+  it('queda en error si la carga del perfil falla con Supabase vivo', async () => {
     supabase.auth.getSession.mockResolvedValue({ data: { session } })
     singleMock.mockResolvedValue({ data: null, error: { message: 'boom' } })
     renderProvider()
     await waitFor(() =>
       expect(screen.getByTestId('status')).toHaveTextContent('error'),
+    )
+  })
+
+  it('entra en modo abierto sin sesión cuando Supabase está caído', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
+    isSupabaseDown.mockResolvedValue(true)
+    renderProvider()
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('open'),
+    )
+  })
+
+  it('entra en modo abierto si el perfil falla porque Supabase está caído', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session } })
+    singleMock.mockResolvedValue({ data: null, error: { message: 'fetch failed' } })
+    isSupabaseDown.mockResolvedValue(true)
+    renderProvider()
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('open'),
+    )
+  })
+
+  it('con Supabase vivo y sin sesión sigue exigiendo login', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
+    isSupabaseDown.mockResolvedValue(false)
+    renderProvider()
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('signedOut'),
     )
   })
 

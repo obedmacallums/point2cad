@@ -12,3 +12,4 @@ docs/**/*.zip
 
 # Variables de entorno locales
 .env
+.env*.local
