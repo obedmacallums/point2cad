@@ -34,6 +34,16 @@ function StatusProbe() {
   return <div data-testid="status">{status}</div>
 }
 
+function SignInProbe() {
+  const { status, signInWithGoogle } = useAuth()
+  return (
+    <>
+      <div data-testid="status">{status}</div>
+      <button onClick={signInWithGoogle}>login</button>
+    </>
+  )
+}
+
 function renderProvider() {
   return render(
     <AuthProvider>
@@ -102,6 +112,43 @@ describe('AuthProvider', () => {
     await waitFor(() =>
       expect(screen.getByTestId('status')).toHaveTextContent('open'),
     )
+  })
+
+  it('el botón de login cae a modo abierto si Supabase se pausó después de cargar', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
+    render(
+      <AuthProvider>
+        <SignInProbe />
+      </AuthProvider>,
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('signedOut'),
+    )
+    // Supabase se pausa mientras el usuario mira el login.
+    isSupabaseDown.mockResolvedValue(true)
+    await act(async () => {
+      screen.getByText('login').click()
+    })
+    expect(screen.getByTestId('status')).toHaveTextContent('open')
+    expect(supabase.auth.signInWithOAuth).not.toHaveBeenCalled()
+  })
+
+  it('el botón de login redirige al OAuth con Supabase vivo', async () => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
+    supabase.auth.signInWithOAuth.mockResolvedValue({ data: {}, error: null })
+    render(
+      <AuthProvider>
+        <SignInProbe />
+      </AuthProvider>,
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('signedOut'),
+    )
+    await act(async () => {
+      screen.getByText('login').click()
+    })
+    expect(supabase.auth.signInWithOAuth).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('status')).toHaveTextContent('signedOut')
   })
 
   it('con Supabase vivo y sin sesión sigue exigiendo login', async () => {

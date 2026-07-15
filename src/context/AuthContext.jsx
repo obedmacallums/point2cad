@@ -97,13 +97,21 @@ export function AuthProvider({ children }) {
     session,
     profile,
     status: deriveAuthStatus({ initializing, session, profile, profileError, supabaseDown }),
-    signInWithGoogle: () =>
-      supabase?.auth.signInWithOAuth({
+    // Sondea antes de redirigir al OAuth: si Supabase se pausó mientras el
+    // usuario tenía el login abierto, el authorize apunta a un dominio sin DNS
+    // y Chrome muestra un error irrecuperable. Mejor caer a modo abierto.
+    signInWithGoogle: async () => {
+      if (!supabase || (await isSupabaseDown())) {
+        setSupabaseDown(true)
+        return
+      }
+      return supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: window.location.origin + import.meta.env.BASE_URL,
         },
-      }),
+      })
+    },
     signOut: () => supabase?.auth.signOut(),
     retry: () => {
       if (session) loadProfile(session.user.id)
