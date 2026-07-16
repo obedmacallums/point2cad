@@ -12,7 +12,7 @@ export default function MapToolbar({ bounds }) {
   const disabled = !bounds
 
   return (
-    <div className="absolute top-14 right-2.5 z-[500] flex flex-col gap-px bg-gray-900/60 backdrop-blur-sm rounded p-px">
+    <div className="absolute top-2.5 right-2.5 z-[500] flex flex-col gap-px bg-gray-900/60 backdrop-blur-sm rounded p-px">
       <button
         type="button"
         onClick={() => bounds && map.fitBounds(bounds, { padding: [24, 24] })}

@@ -102,7 +102,13 @@ describe('MapView', () => {
     expect(urls[1]).toContain('World_Boundaries_and_Places')
   })
 
-  it('el mapa y las capas de tiles permiten zoom hasta 21 (over-zoom con maxNativeZoom 19)', () => {
+  it('el mapa permite zoom hasta 21; maxNativeZoom es 19 en OSM y 18 en las capas de Esri', () => {
+    // maxNativeZoom más bajo en Esri (Satélite e Híbrido) que en OSM: la
+    // cobertura de imagen de alta resolución de Esri World_Imagery no es
+    // uniforme en todo el mundo, y pedir tiles nativos a zoom 19 en zonas sin
+    // esa resolución hace que Esri responda con un tile "Imagery not
+    // available" (200 OK, no un error que Leaflet pueda detectar). OSM sí
+    // tiene cobertura global consistente hasta 19, así que no se ve afectado.
     render(<MapView />)
     expect(screen.getByTestId('map').getAttribute('data-max-zoom')).toBe('21')
 
@@ -110,7 +116,8 @@ describe('MapView', () => {
     expect(tiles).toHaveLength(4)
     tiles.forEach((tile) => {
       expect(tile.getAttribute('data-max-zoom')).toBe('21')
-      expect(tile.getAttribute('data-max-native-zoom')).toBe('19')
+      const isOsm = tile.getAttribute('data-url').includes('openstreetmap')
+      expect(tile.getAttribute('data-max-native-zoom')).toBe(isOsm ? '19' : '18')
     })
   })
 

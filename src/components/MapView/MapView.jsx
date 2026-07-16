@@ -129,10 +129,15 @@ export default function MapView({ active = true }) {
             y Leaflet 1.9 no pide los tiles con atributo crossorigin por defecto. Ambos
             hosts responden con Access-Control-Allow-Origin: *, así que un fetch en modo
             CORS satisface el COEP y evita que el navegador bloquee los tiles.
-            maxNativeZoom={19}: los tres servicios (OSM y los dos de Esri) sirven tiles
-            nativos hasta zoom 19; maxZoom={21} en MapContainer y aquí permite que
-            Leaflet amplíe (over-zoom) el último tile disponible por encima de eso. */}
-        <LayersControl position="topright">
+            maxNativeZoom distinto por proveedor: OSM tiene cobertura global consistente
+            hasta zoom 19. Esri World_Imagery NO — su resolución real varía por región, y
+            pedir tiles nativos más allá de lo que esa zona tiene capturado hace que Esri
+            responda con un tile "Imagery not available" (200 OK, no un error detectable
+            por Leaflet). Por eso Satélite e Híbrido usan maxNativeZoom={18} (el nivel que
+            ya funcionaba de forma fiable antes de subir maxZoom), mientras que
+            maxZoom={21} en MapContainer y en cada capa permite seguir dando over-zoom
+            (ampliar el último tile real) por encima de la resolución nativa de cada una. */}
+        <LayersControl position="bottomright">
           <LayersControl.BaseLayer checked name="OpenStreetMap">
             <TileLayer
               url={OSM_URL}
@@ -148,7 +153,7 @@ export default function MapView({ active = true }) {
               attribution={SAT_ATTR}
               crossOrigin="anonymous"
               maxZoom={21}
-              maxNativeZoom={19}
+              maxNativeZoom={18}
             />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Híbrido">
@@ -158,14 +163,14 @@ export default function MapView({ active = true }) {
                 attribution={SAT_ATTR}
                 crossOrigin="anonymous"
                 maxZoom={21}
-                maxNativeZoom={19}
+                maxNativeZoom={18}
               />
               <TileLayer
                 url={LABELS_URL}
                 attribution={SAT_ATTR}
                 crossOrigin="anonymous"
                 maxZoom={21}
-                maxNativeZoom={19}
+                maxNativeZoom={18}
               />
             </LayerGroup>
           </LayersControl.BaseLayer>
