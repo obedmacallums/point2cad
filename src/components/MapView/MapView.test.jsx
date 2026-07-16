@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import MapView from './MapView'
 import { useApp } from '../../context/AppContext'
 import { __mapMock } from 'react-leaflet'
@@ -98,5 +98,37 @@ describe('MapView', () => {
     render(<MapView />)
     const events = __mapMock.on.mock.calls.map(([eventName]) => eventName)
     expect(events).toEqual(expect.arrayContaining(['tileerror', 'tileload']))
+  })
+
+  it('el botón "Ajustar vista" está habilitado y llama a fitBounds al hacer click', () => {
+    render(<MapView />)
+    const btn = screen.getByRole('button', { name: 'Ajustar vista' })
+    expect(btn).not.toBeDisabled()
+
+    // MapController ya llama a fitBounds una vez al montar (efecto sobre
+    // datasetKey). Se limpia aquí para aislar la llamada disparada por el
+    // click del botón, que es lo que este test verifica.
+    __mapMock.fitBounds.mockClear()
+
+    fireEvent.click(btn)
+
+    expect(__mapMock.fitBounds).toHaveBeenCalledTimes(1)
+    const [bounds, options] = __mapMock.fitBounds.mock.calls[0]
+    expect(bounds).toHaveLength(2) // [[minLat, minLng], [maxLat, maxLng]]
+    expect(bounds[0]).toHaveLength(2)
+    expect(bounds[1]).toHaveLength(2)
+    expect(options).toEqual({ padding: [24, 24] })
+  })
+
+  it('el botón "Ajustar vista" está deshabilitado cuando no hay geometría visible', () => {
+    const state = mockState()
+    Object.keys(state.featureLibrary).forEach((codigo) => {
+      state.featureLibrary[codigo] = { ...state.featureLibrary[codigo], visible: false }
+    })
+    useApp.mockReturnValue({ state })
+
+    render(<MapView />)
+    const btn = screen.getByRole('button', { name: 'Ajustar vista' })
+    expect(btn).toBeDisabled()
   })
 })

@@ -13,6 +13,7 @@ import 'leaflet/dist/leaflet.css'
 import { useApp } from '../../context/AppContext'
 import { resolveZone } from '../../utils/geoConvert'
 import { buildMapLayers } from './mapLayers'
+import MapToolbar from './MapToolbar'
 
 const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 const OSM_ATTR = '© OpenStreetMap contributors'
@@ -133,6 +134,8 @@ export default function MapView({ active = true }) {
             <TileLayer url={SAT_URL} attribution={SAT_ATTR} crossOrigin="anonymous" />
           </LayersControl.BaseLayer>
         </LayersControl>
+
+        <MapToolbar bounds={layers.bounds} />
 
         {layers.points.map((p) => (
           <CircleMarker
