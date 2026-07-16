@@ -3,6 +3,7 @@ import {
   MapContainer,
   TileLayer,
   LayersControl,
+  LayerGroup,
   CircleMarker,
   Polyline,
   Polygon,
@@ -20,6 +21,8 @@ const OSM_ATTR = '© OpenStreetMap contributors'
 const SAT_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const SAT_ATTR = 'Esri, Maxar, Earthstar Geographics'
+const LABELS_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
 
 // Controla el mapa desde dentro de MapContainer (donde useMap tiene contexto):
 // corrige el tamaño al hacerse visible, encaja el dataset solo cuando cambia, y
@@ -121,17 +124,50 @@ export default function MapView({ active = true }) {
           Sin conexión: no se puede cargar el mapa base
         </div>
       )}
-      <MapContainer center={center} zoom={13} preferCanvas className="h-full w-full">
+      <MapContainer center={center} zoom={13} maxZoom={21} preferCanvas className="h-full w-full">
         {/* crossOrigin="anonymous": el dev server fija COEP require-corp (vite.config.js)
             y Leaflet 1.9 no pide los tiles con atributo crossorigin por defecto. Ambos
             hosts responden con Access-Control-Allow-Origin: *, así que un fetch en modo
-            CORS satisface el COEP y evita que el navegador bloquee los tiles. */}
+            CORS satisface el COEP y evita que el navegador bloquee los tiles.
+            maxNativeZoom={19}: los tres servicios (OSM y los dos de Esri) sirven tiles
+            nativos hasta zoom 19; maxZoom={21} en MapContainer y aquí permite que
+            Leaflet amplíe (over-zoom) el último tile disponible por encima de eso. */}
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="OpenStreetMap">
-            <TileLayer url={OSM_URL} attribution={OSM_ATTR} crossOrigin="anonymous" />
+            <TileLayer
+              url={OSM_URL}
+              attribution={OSM_ATTR}
+              crossOrigin="anonymous"
+              maxZoom={21}
+              maxNativeZoom={19}
+            />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Satélite (Esri)">
-            <TileLayer url={SAT_URL} attribution={SAT_ATTR} crossOrigin="anonymous" />
+            <TileLayer
+              url={SAT_URL}
+              attribution={SAT_ATTR}
+              crossOrigin="anonymous"
+              maxZoom={21}
+              maxNativeZoom={19}
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Híbrido">
+            <LayerGroup>
+              <TileLayer
+                url={SAT_URL}
+                attribution={SAT_ATTR}
+                crossOrigin="anonymous"
+                maxZoom={21}
+                maxNativeZoom={19}
+              />
+              <TileLayer
+                url={LABELS_URL}
+                attribution={SAT_ATTR}
+                crossOrigin="anonymous"
+                maxZoom={21}
+                maxNativeZoom={19}
+              />
+            </LayerGroup>
           </LayersControl.BaseLayer>
         </LayersControl>
 

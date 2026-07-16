@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import MapView from './MapView'
 import { useApp } from '../../context/AppContext'
 import { __mapMock } from 'react-leaflet'
@@ -13,14 +13,26 @@ vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }))
 vi.mock('react-leaflet', () => {
   const Base = ({ children }) => <div>{children}</div>
   const LayersControl = ({ children }) => <div>{children}</div>
-  LayersControl.BaseLayer = ({ children }) => <div>{children}</div>
+  LayersControl.BaseLayer = ({ name, children }) => (
+    <div data-testid="baselayer" data-name={name}>{children}</div>
+  )
+  const LayerGroup = ({ children }) => <div data-testid="layergroup">{children}</div>
   const mapMock = { invalidateSize: vi.fn(), fitBounds: vi.fn(), on: vi.fn(), off: vi.fn() }
   return {
-    MapContainer: ({ children }) => <div data-testid="map">{children}</div>,
-    TileLayer: ({ url, crossOrigin }) => (
-      <div data-testid="tile" data-url={url} data-cross={crossOrigin} />
+    MapContainer: ({ children, maxZoom }) => (
+      <div data-testid="map" data-max-zoom={maxZoom}>{children}</div>
+    ),
+    TileLayer: ({ url, crossOrigin, maxZoom, maxNativeZoom }) => (
+      <div
+        data-testid="tile"
+        data-url={url}
+        data-cross={crossOrigin}
+        data-max-zoom={maxZoom}
+        data-max-native-zoom={maxNativeZoom}
+      />
     ),
     LayersControl,
+    LayerGroup,
     CircleMarker: ({ children, pathOptions }) => (
       <div data-testid="circle" data-color={pathOptions.color}>{children}</div>
     ),
@@ -67,17 +79,39 @@ beforeEach(() => {
 })
 
 describe('MapView', () => {
-  it('renderiza las dos capas base (OSM y satélite)', () => {
+  it('renderiza las tres capas base (OSM, satélite e híbrido)', () => {
     render(<MapView />)
-    const urls = screen.getAllByTestId('tile').map((t) => t.getAttribute('data-url'))
-    expect(urls.some((u) => u.includes('openstreetmap'))).toBe(true)
-    expect(urls.some((u) => u.includes('arcgisonline'))).toBe(true)
+    const names = screen.getAllByTestId('baselayer').map((el) => el.getAttribute('data-name'))
+    expect(names).toEqual(['OpenStreetMap', 'Satélite (Esri)', 'Híbrido'])
   })
 
-  it('las dos capas base llevan crossOrigin="anonymous" (para pasar COEP require-corp)', () => {
+  it('todas las capas de tiles llevan crossOrigin="anonymous" (para pasar COEP require-corp)', () => {
     render(<MapView />)
     const crossValues = screen.getAllByTestId('tile').map((t) => t.getAttribute('data-cross'))
-    expect(crossValues).toEqual(['anonymous', 'anonymous'])
+    expect(crossValues).toEqual(['anonymous', 'anonymous', 'anonymous', 'anonymous'])
+  })
+
+  it('la capa "Híbrido" combina imagen satelital y etiquetas (dos TileLayer con URLs distintas)', () => {
+    render(<MapView />)
+    const hibrido = screen
+      .getAllByTestId('baselayer')
+      .find((el) => el.getAttribute('data-name') === 'Híbrido')
+    const urls = within(hibrido).getAllByTestId('tile').map((t) => t.getAttribute('data-url'))
+    expect(urls).toHaveLength(2)
+    expect(urls[0]).toContain('World_Imagery')
+    expect(urls[1]).toContain('World_Boundaries_and_Places')
+  })
+
+  it('el mapa y las capas de tiles permiten zoom hasta 21 (over-zoom con maxNativeZoom 19)', () => {
+    render(<MapView />)
+    expect(screen.getByTestId('map').getAttribute('data-max-zoom')).toBe('21')
+
+    const tiles = screen.getAllByTestId('tile')
+    expect(tiles).toHaveLength(4)
+    tiles.forEach((tile) => {
+      expect(tile.getAttribute('data-max-zoom')).toBe('21')
+      expect(tile.getAttribute('data-max-native-zoom')).toBe('19')
+    })
   })
 
   it('genera una capa por tipo de entidad visible (excluye visible:false)', () => {
