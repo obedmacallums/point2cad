@@ -2,18 +2,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import MapView from './MapView'
 import { useApp } from '../../context/AppContext'
+import { __mapMock } from 'react-leaflet'
 
 vi.mock('../../context/AppContext', () => ({ useApp: vi.fn() }))
 
 // react-leaflet mockeado: cada componente renderiza un marcador simple que
 // expone el color por data-attr, para poder contar capas por tipo.
+// mapMock: instancia compartida devuelta por useMap para poder inspeccionar,
+// en los tests, qué eventos se suscriben/desuscriben (on/off) en MapController.
 vi.mock('react-leaflet', () => {
   const Base = ({ children }) => <div>{children}</div>
   const LayersControl = ({ children }) => <div>{children}</div>
   LayersControl.BaseLayer = ({ children }) => <div>{children}</div>
+  const mapMock = { invalidateSize: vi.fn(), fitBounds: vi.fn(), on: vi.fn(), off: vi.fn() }
   return {
     MapContainer: ({ children }) => <div data-testid="map">{children}</div>,
-    TileLayer: ({ url }) => <div data-testid="tile" data-url={url} />,
+    TileLayer: ({ url, crossOrigin }) => (
+      <div data-testid="tile" data-url={url} data-cross={crossOrigin} />
+    ),
     LayersControl,
     CircleMarker: ({ children, pathOptions }) => (
       <div data-testid="circle" data-color={pathOptions.color}>{children}</div>
@@ -25,7 +31,8 @@ vi.mock('react-leaflet', () => {
       <div data-testid="polygon" data-color={pathOptions.color}>{children}</div>
     ),
     Popup: Base,
-    useMap: () => ({ invalidateSize: vi.fn(), fitBounds: vi.fn(), on: vi.fn(), off: vi.fn() }),
+    useMap: () => mapMock,
+    __mapMock: mapMock,
   }
 })
 
@@ -67,6 +74,12 @@ describe('MapView', () => {
     expect(urls.some((u) => u.includes('arcgisonline'))).toBe(true)
   })
 
+  it('las dos capas base llevan crossOrigin="anonymous" (para pasar COEP require-corp)', () => {
+    render(<MapView />)
+    const crossValues = screen.getAllByTestId('tile').map((t) => t.getAttribute('data-cross'))
+    expect(crossValues).toEqual(['anonymous', 'anonymous'])
+  })
+
   it('genera una capa por tipo de entidad visible (excluye visible:false)', () => {
     render(<MapView />)
     expect(screen.getAllByTestId('circle')).toHaveLength(1) // OCULTO excluido
@@ -79,5 +92,11 @@ describe('MapView', () => {
     expect(screen.getByTestId('circle').getAttribute('data-color')).toBe('#22c55e')
     expect(screen.getByTestId('polyline').getAttribute('data-color')).toBe('#3b82f6')
     expect(screen.getByTestId('polygon').getAttribute('data-color')).toBe('#eab308')
+  })
+
+  it('suscribe tanto tileerror como tileload en el mapa (para poder limpiar el banner)', () => {
+    render(<MapView />)
+    const events = __mapMock.on.mock.calls.map(([eventName]) => eventName)
+    expect(events).toEqual(expect.arrayContaining(['tileerror', 'tileload']))
   })
 })

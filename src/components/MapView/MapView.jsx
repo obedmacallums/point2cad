@@ -23,7 +23,7 @@ const SAT_ATTR = 'Esri, Maxar, Earthstar Geographics'
 // Controla el mapa desde dentro de MapContainer (donde useMap tiene contexto):
 // corrige el tamaño al hacerse visible, encaja el dataset solo cuando cambia, y
 // escucha errores de tiles para avisar sin bloquear.
-function MapController({ bounds, datasetKey, active, onTileError }) {
+function MapController({ bounds, datasetKey, active, onTileError, onTileLoad }) {
   const map = useMap()
 
   // Leaflet calcula mal el tamaño si se montó oculto; al pasar a visible lo
@@ -38,10 +38,17 @@ function MapController({ bounds, datasetKey, active, onTileError }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasetKey])
 
+  // El banner de "sin conexión" se activa con el primer tileerror y se limpia
+  // en cuanto un tile carga con éxito: así no queda fijo toda la sesión tras
+  // un único fallo transitorio (mapa persistente entre alternancias 3D⇄Mapa).
   useEffect(() => {
     map.on('tileerror', onTileError)
-    return () => map.off('tileerror', onTileError)
-  }, [map, onTileError])
+    map.on('tileload', onTileLoad)
+    return () => {
+      map.off('tileerror', onTileError)
+      map.off('tileload', onTileLoad)
+    }
+  }, [map, onTileError, onTileLoad])
 
   return null
 }
@@ -71,6 +78,7 @@ export default function MapView({ active = true }) {
   const { state } = useApp()
   const [tileError, setTileError] = useState(false)
   const handleTileError = useCallback(() => setTileError(true), [])
+  const handleTileLoad = useCallback(() => setTileError(false), [])
 
   const zoneInfo = useMemo(
     () =>
@@ -113,12 +121,16 @@ export default function MapView({ active = true }) {
         </div>
       )}
       <MapContainer center={center} zoom={13} preferCanvas className="h-full w-full">
+        {/* crossOrigin="anonymous": el dev server fija COEP require-corp (vite.config.js)
+            y Leaflet 1.9 no pide los tiles con atributo crossorigin por defecto. Ambos
+            hosts responden con Access-Control-Allow-Origin: *, así que un fetch en modo
+            CORS satisface el COEP y evita que el navegador bloquee los tiles. */}
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="OpenStreetMap">
-            <TileLayer url={OSM_URL} attribution={OSM_ATTR} />
+            <TileLayer url={OSM_URL} attribution={OSM_ATTR} crossOrigin="anonymous" />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Satélite (Esri)">
-            <TileLayer url={SAT_URL} attribution={SAT_ATTR} />
+            <TileLayer url={SAT_URL} attribution={SAT_ATTR} crossOrigin="anonymous" />
           </LayersControl.BaseLayer>
         </LayersControl>
 
@@ -160,6 +172,7 @@ export default function MapView({ active = true }) {
           datasetKey={datasetKey}
           active={active}
           onTileError={handleTileError}
+          onTileLoad={handleTileLoad}
         />
       </MapContainer>
     </div>

@@ -26,6 +26,9 @@ export function buildMapLayers(geometry, featureLibrary = {}, zoneInfo) {
   const visPl = (geometry.polylines ?? []).filter((pl) => isVisible(featureLibrary, pl.codigo))
 
   // reprojectGeometryToWGS84 devuelve puntos con x=lng, y=lat y vértices [lng, lat, z].
+  // Contrato del que depende el mapeo por índice de más abajo (wgs.points[i] con
+  // visP[i], wgs.lines[i] con visL[i], wgs.polylines[i] con visPl[i]): esta función
+  // debe preservar el orden y la longitud 1:1 de cada colección de entrada.
   const wgs = reprojectGeometryToWGS84(
     { points: visP, lines: visL, polylines: visPl },
     zoneInfo.zone,
